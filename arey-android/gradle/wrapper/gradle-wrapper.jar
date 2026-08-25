@@ -1,0 +1,6 @@
+{
+  "errors" : [ {
+    "status" : 404,
+    "message" : "Could not find resource; Path: 'libs-releases:org/gradle/gradle-wrapper/8.5/gradle-wrapper-8.5.jar'"
+  } ]
+}

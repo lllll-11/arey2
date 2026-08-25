@@ -1,0 +1,23 @@
+# Ambientes virtuales y dependencias
+venv/
+.venv/
+__pycache__/
+*.pyc
+
+# Archivos de entorno y credenciales locales
+.env
+data/
+*.db
+
+# Binarios y descargas temporales
+cloudflared.exe
+gradle-8.5-bin.zip
+gradle_bin/
+*.apk
+
+# Android Studio & Gradle caches
+.gradle/
+.idea/
+build/
+app/build/
+local.properties
