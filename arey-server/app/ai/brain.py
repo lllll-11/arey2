@@ -161,8 +161,8 @@ No eres un robot corporativo, ni un bot de soporte técnico, ni una IA acartonad
         seen = set()
         models_to_try = [m for m in candidate_models if not (m in seen or seen.add(m))]
 
-        # Cargar historial reciente de la memoria compartida
-        recent_history = await memory_manager.get_recent_history(limit=8)
+        # Cargar historial reciente (solo 4 mensajes para minimizar latencia)
+        recent_history = await memory_manager.get_recent_history(limit=4)
         history_contents = []
         for msg in recent_history[:-1]:
             role = "user" if msg["role"] == "user" else "model"
