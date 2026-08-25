@@ -5,9 +5,18 @@ from config import WAKE_WORDS
 
 logger = logging.getLogger("AreyPC")
 
-EXTENDED_WAKE_WORDS = [
+# Palabras clave de activación (nombre de Arey)
+WAKE_KEYWORDS = [
     "arey", "ari", "aree", "haré", "aré", "aire", "harry", "are", 
-    "oye arey", "hey arey", "hola arey", "oye", "hey", "hola", "alexa"
+    "oye arey", "hey arey", "hola arey", "oye ari", "hey ari", "oye", "alexa"
+]
+
+# Acciones directas que activan la ejecución inmediata aunque no digas 'Arey'
+DIRECT_COMMAND_TRIGGERS = [
+    "teléfono", "telefono", "celular", "busca mi", "dónde está", "donde esta",
+    "abre", "abrir", "pon ", "reproduce", "apaga", "prende", "encender",
+    "volumen", "silencia", "pausa", "continua", "qué hora", "que hora",
+    "clima", "cómo estás", "como estas", "quién eres", "quien eres", "alarma"
 ]
 
 class WakeWordDetector:
@@ -18,30 +27,48 @@ class WakeWordDetector:
         self.recognizer.pause_threshold = 0.5
         self.is_running = True
 
-    def listen_for_wake_word(self) -> bool:
+    def listen_for_wake_word_or_command(self) -> dict:
         """
-        Escucha continuamente en segundo plano hasta detectar la palabra de activación 'Arey'.
+        Escucha continuamente. Si detecta 'Arey' o una orden directa (ej: 'busca mi teléfono'),
+        lo procesa al instante.
+        Retorna dict con:
+          - 'activated': bool
+          - 'direct_command': str (si el usuario ya dijo la orden completa, ej: 'busca mi teléfono')
         """
         try:
             with sr.Microphone() as source:
                 logger.info("🎤 Calibrando micrófono...")
-                self.recognizer.adjust_for_ambient_noise(source, duration=0.6)
-                logger.info("🎤 [MICRÓFONO LISTO] Puedes hablar: di 'Arey' u 'Oye Arey'...")
+                self.recognizer.adjust_for_ambient_noise(source, duration=0.5)
+                logger.info("🎤 [MICRÓFONO LISTO] Di 'Arey' o una orden directa (ej: 'busca mi teléfono')...")
 
                 while self.is_running:
                     try:
-                        # Escuchar fragmento de audio
-                        audio = self.recognizer.listen(source, timeout=None, phrase_time_limit=4.0)
+                        audio = self.recognizer.listen(source, timeout=None, phrase_time_limit=5.0)
                         try:
                             text = self.recognizer.recognize_google(audio, language="es-MX").lower().strip()
                             logger.info(f"🔊 Escuché: '{text}'")
                             
-                            # Comprobar si contiene 'Arey' o palabras clave
-                            if any(w in text for w in EXTENDED_WAKE_WORDS):
+                            # 1. Comprobar si contiene 'Arey'
+                            contains_wake = any(w in text for w in WAKE_KEYWORDS)
+                            # 2. Comprobar si es una orden directa
+                            is_direct_cmd = any(c in text for c in DIRECT_COMMAND_TRIGGERS)
+
+                            if contains_wake or is_direct_cmd:
                                 logger.info(f"✨ ¡Activación detectada! -> '{text}'")
-                                return True
+                                
+                                # Limpiar la palabra de activación del texto si la incluye
+                                cleaned_cmd = text
+                                for w in WAKE_KEYWORDS:
+                                    cleaned_cmd = cleaned_cmd.replace(w, "").strip()
+
+                                # Si después de quitar 'Arey' aún queda una orden (ej: 'busca mi teléfono')
+                                if len(cleaned_cmd) > 2:
+                                    return {"activated": True, "direct_command": cleaned_cmd}
+                                else:
+                                    # Solo dijo 'Arey', pedirle la orden
+                                    return {"activated": True, "direct_command": None}
+
                         except sr.UnknownValueError:
-                            # Sonido no reconocido como palabra, continuar escuchando
                             continue
                         except sr.RequestError as e:
                             logger.warning(f"Error de conexión en reconocimiento: {e}")
@@ -51,12 +78,12 @@ class WakeWordDetector:
                         continue
                     except Exception as e:
                         logger.debug(f"Ciclo audio: {e}")
-                        time.sleep(0.5)
+                        time.sleep(0.3)
                         continue
         except Exception as e:
             logger.error(f"Error accediendo al micrófono: {e}")
-            time.sleep(2) # Evitar bucle rápido si el dispositivo está ocupado
+            time.sleep(2)
 
-        return False
+        return {"activated": False, "direct_command": None}
 
 wake_detector = WakeWordDetector()
