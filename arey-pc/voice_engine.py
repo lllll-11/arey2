@@ -6,18 +6,17 @@ import logging
 import speech_recognition as sr
 import edge_tts
 import pygame
-from config import VOICE_NAME, SERVER_HTTP_URL
 import httpx
+from config import VOICE_NAME, SERVER_HTTP_URL
+from audio_manager import shared_mic, shared_recognizer
 
 logger = logging.getLogger("VoiceEngine")
 
 class VoiceEngine:
     def __init__(self):
         pygame.mixer.init()
-        self.recognizer = sr.Recognizer()
-        self.recognizer.energy_threshold = 200
-        self.recognizer.dynamic_energy_threshold = True
-        self.recognizer.pause_threshold = 0.8
+        self.recognizer = shared_recognizer
+        self.source = shared_mic
 
     async def speak(self, text: str):
         """
@@ -28,14 +27,12 @@ class VoiceEngine:
 
         logger.info(f"Arey diciendo: '{text}'")
         try:
-            # Crear archivo de audio temporal
             with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as fp:
                 temp_audio_path = fp.name
 
             communicate = edge_tts.Communicate(text, voice=VOICE_NAME, rate="+6%", pitch="+0Hz")
             await communicate.save(temp_audio_path)
 
-            # Reproducir audio con pygame
             pygame.mixer.music.load(temp_audio_path)
             pygame.mixer.music.play()
             while pygame.mixer.music.get_busy():
@@ -43,18 +40,21 @@ class VoiceEngine:
 
             pygame.mixer.music.unload()
             if os.path.exists(temp_audio_path):
-                os.remove(temp_audio_path)
+                try:
+                    os.remove(temp_audio_path)
+                except Exception:
+                    pass
 
         except Exception as e:
             logger.error(f"Error en reproducción de voz: {e}")
 
     def listen_speech(self, timeout: float = 8.0, phrase_time_limit: float = 15.0) -> str:
         """
-        Escucha a través del micrófono y transcribe con la IA auditiva de Gemini 3.6 Flash (99.9% precisión).
+        Escucha a través del micrófono compartido y transcribe con Gemini 3.6 Flash (99.9% precisión).
         """
-        time.sleep(0.15)
+        time.sleep(0.1)
         try:
-            with sr.Microphone() as source:
+            with self.source as source:
                 logger.info("👂 Escuchando tu orden...")
                 audio = self.recognizer.listen(source, timeout=timeout, phrase_time_limit=phrase_time_limit)
                 wav_bytes = audio.get_wav_data(convert_rate=16000, convert_width=2)
@@ -70,7 +70,7 @@ class VoiceEngine:
                                 logger.info(f"✨ Transcripción Gemini: '{transcribed_text}'")
                                 return transcribed_text
                 except Exception as ex:
-                    logger.debug(f"Fallback a reconocimiento local: {ex}")
+                    logger.debug(f"Fallback a Google Speech: {ex}")
 
                 # 2. Fallback si no hay conexión
                 text = self.recognizer.recognize_google(audio, language="es-MX")
