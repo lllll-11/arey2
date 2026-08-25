@@ -146,65 +146,87 @@ No eres un robot corporativo, ni un bot de soporte técnico, ni una IA acartonad
         # 3. Preparar el modelo Gemini con instrucciones y herramientas
         system_instruction = await self._build_system_instruction()
 
-        try:
-            # Cargar historial reciente de la memoria compartida
-            recent_history = await memory_manager.get_recent_history(limit=8)
-            history_contents = []
-            for msg in recent_history[:-1]:
-                role = "user" if msg["role"] == "user" else "model"
-                history_contents.append(types.Content(
-                    role=role,
-                    parts=[types.Part.from_text(text=msg["content"])]
-                ))
+        candidate_models = [
+            "gemini-3.5-flash",
+            "gemini-3.7-flash",
+            "gemini-3.5-flash-lite",
+            "gemini-3.1-flash-lite"
+        ]
 
-            chat = self.client.aio.chats.create(
-                model=settings.GEMINI_MODEL,
-                config=types.GenerateContentConfig(
-                    system_instruction=system_instruction,
-                    tools=self.available_tools,
-                    temperature=0.7
-                ),
-                history=history_contents
-            )
+        # Eliminar duplicados preservando el orden
+        seen = set()
+        models_to_try = [m for m in candidate_models if not (m in seen or seen.add(m))]
 
-            # Enviar mensaje con Tool Calling automático
-            response = await chat.send_message(user_text)
-            final_text = response.text.strip() if response and response.text else "Listo, he ejecutado la acción."
+        # Cargar historial reciente de la memoria compartida
+        recent_history = await memory_manager.get_recent_history(limit=8)
+        history_contents = []
+        for msg in recent_history[:-1]:
+            role = "user" if msg["role"] == "user" else "model"
+            history_contents.append(types.Content(
+                role=role,
+                parts=[types.Part.from_text(text=msg["content"])]
+            ))
 
-            # 4. Guardar la respuesta de Arey en la memoria continua
-            await memory_manager.add_message(role="assistant", content=final_text, device_source=device_source)
+        last_error = None
+        for model_name in models_to_try:
+            try:
+                chat = self.client.aio.chats.create(
+                    model=model_name,
+                    config=types.GenerateContentConfig(
+                        system_instruction=system_instruction,
+                        tools=self.available_tools,
+                        temperature=0.7
+                    ),
+                    history=history_contents
+                )
 
-            # 5. Extracción pasiva de hechos en segundo plano
-            asyncio.create_task(learning_engine.extract_facts_background(user_text, final_text))
+                # Enviar mensaje con Tool Calling automático
+                response = await chat.send_message(user_text)
+                final_text = response.text.strip() if response and response.text else "Listo, he ejecutado la acción."
 
-            return final_text
+                # 4. Guardar la respuesta de Arey en la memoria continua
+                await memory_manager.add_message(role="assistant", content=final_text, device_source=device_source)
 
-        except Exception as e:
-            logger.error(f"Error procesando mensaje en AreyBrain: {e}", exc_info=True)
-            return "Tuve un pequeño problema procesando eso, ¿me lo repites?"
+                # 5. Extracción pasiva de hechos en segundo plano
+                asyncio.create_task(learning_engine.extract_facts_background(user_text, final_text))
+
+                return final_text
+
+            except Exception as e:
+                logger.warning(f"Modelo '{model_name}' reportó: {e}. Probando siguiente modelo de respaldo...")
+                last_error = e
+                continue
+
+        logger.error(f"Todos los modelos de Gemini fallaron. Último error: {last_error}", exc_info=True)
+        return "Tuve un pequeño problema de conexión con la IA, ¿me lo repites?"
 
     async def transcribe_audio_bytes(self, audio_bytes: bytes, mime_type: str = "audio/wav") -> str:
         """
-        Transcribe audio utilizando la comprensión auditiva nativa de Gemini 3.6 Flash.
-        Tiene una precisión de 99.9% en español, reconociendo modismos, nombres y acentos.
+        Transcribe audio utilizando la comprensión auditiva de Gemini con fallback multi-modelo.
         """
         if not self.client:
             self._init_gemini()
             if not self.client:
                 return ""
 
-        try:
-            prompt = "Transcribe con máxima precisión lo que dice el usuario en este audio en español. Devuelve ÚNICAMENTE el texto que dijo, sin comentarios, sin formato extra y sin comillas."
-            response = await self.client.aio.models.generate_content(
-                model=settings.GEMINI_MODEL,
-                contents=[
-                    types.Part.from_bytes(data=audio_bytes, mime_type=mime_type),
-                    prompt
-                ]
-            )
-            return response.text.strip() if response and response.text else ""
-        except Exception as e:
-            logger.error(f"Error transcribiendo audio con Gemini: {e}")
-            return ""
+        prompt = "Transcribe con máxima precisión lo que dice el usuario en este audio en español. Devuelve ÚNICAMENTE el texto que dijo, sin comentarios, sin formato extra y sin comillas."
+        models_to_try = ["gemini-3.5-flash", "gemini-3.7-flash", "gemini-3.5-flash-lite"]
+
+        for model_name in models_to_try:
+            try:
+                response = await self.client.aio.models.generate_content(
+                    model=model_name,
+                    contents=[
+                        types.Part.from_bytes(data=audio_bytes, mime_type=mime_type),
+                        prompt
+                    ]
+                )
+                if response and response.text:
+                    return response.text.strip()
+            except Exception as e:
+                logger.warning(f"Error transcribiendo con {model_name}: {e}")
+                continue
+
+        return ""
 
 arey_brain = AreyBrain()
