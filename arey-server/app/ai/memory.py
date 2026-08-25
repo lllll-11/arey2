@@ -236,16 +236,34 @@ class MemoryManager:
             return len(contacts)
 
     async def search_contact(self, query: str) -> Optional[Dict[str, str]]:
+        q_clean = query.lower().strip()
         async with aiosqlite.connect(self.db_path) as db:
             db.row_factory = aiosqlite.Row
-            # Búsqueda exacta o parcial
-            cursor = await db.execute(
-                "SELECT name, phone_number FROM contacts WHERE name LIKE ? ORDER BY LENGTH(name) ASC LIMIT 1",
-                (f"%{query}%",)
-            )
-            row = await cursor.fetchone()
-            if row:
-                return {"name": row["name"], "phone_number": row["phone_number"]}
+            cursor = await db.execute("SELECT name, phone_number FROM contacts")
+            rows = await cursor.fetchall()
+            if not rows:
+                return None
+
+            best_match = None
+            best_score = 0.0
+
+            from difflib import SequenceMatcher
+            for row in rows:
+                name_clean = row["name"].lower().strip()
+                # 1. Coincidencia directa o parcial
+                if q_clean == name_clean or q_clean in name_clean or name_clean in q_clean:
+                    return {"name": row["name"], "phone_number": row["phone_number"]}
+
+                # 2. Similitud fonética/ortográfica difflib
+                ratio = SequenceMatcher(None, q_clean, name_clean).ratio()
+                if ratio > best_score:
+                    best_score = ratio
+                    best_match = {"name": row["name"], "phone_number": row["phone_number"]}
+
+            if best_score >= 0.50:
+                logger.info(f"Contacto emparejado por similitud fonética ({best_score:.2f}): '{query}' -> '{best_match['name']}'")
+                return best_match
+
             return None
 
     # ==================== RECORDATORIOS ====================

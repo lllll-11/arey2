@@ -70,15 +70,28 @@ class VoiceEngine:
             logger.error(f"Error en voz: {e}")
 
     def _apply_corrections(self, text: str, profile: dict) -> str:
-        corrections = profile.get("phonetic_corrections", {})
-        words = text.split()
-        modified = False
-        for i, w in enumerate(words):
-            w_lower = w.lower().strip(".,;:?!")
-            if w_lower in corrections:
-                words[i] = corrections[w_lower]
-                modified = True
-        return " ".join(words) if modified else text
+        import re
+        corrections = {
+            "spoty": "Spotify", "espotifai": "Spotify", "spotifay": "Spotify", "spoti": "Spotify",
+            "yutu": "YouTube", "yutub": "YouTube", "llutu": "YouTube", "tutube": "YouTube",
+            "wasap": "WhatsApp", "guatsap": "WhatsApp", "wats": "WhatsApp", "guasap": "WhatsApp",
+            "feis": "Facebook", "feisbu": "Facebook", "feisbuc": "Facebook",
+            "neflis": "Netflix", "neflix": "Netflix", "netflis": "Netflix",
+            "chayipiti": "ChatGPT", "chatyipiti": "ChatGPT", "chat gpt": "ChatGPT",
+            "cuin": "Queen",
+            "badboni": "Bad Bunny", "bad boni": "Bad Bunny", "bad buni": "Bad Bunny",
+            "cel": "teléfono", "celu": "teléfono", "fono": "teléfono",
+            "tele": "tele", "pantalla": "tele",
+            "laris": "Larissa", "larisa": "Larissa", "larisse": "Larissa", "lari": "Larissa"
+        }
+        corrections.update(profile.get("phonetic_corrections", {}))
+
+        result_text = text
+        for wrong, right in corrections.items():
+            pattern = re.compile(rf"\b{re.escape(wrong)}\b", re.IGNORECASE)
+            result_text = pattern.sub(right, result_text)
+
+        return result_text
 
     def _transcribe(self, wav_bytes: bytes) -> str:
         """Transcripción local con Whisper tiny personalizada con el vocabulario del usuario."""
