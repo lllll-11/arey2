@@ -227,6 +227,41 @@ async def tool_control_smart_tv(command: str, app_name: Optional[str] = None) ->
     )
     return res
 
+async def tool_play_music(query: str, platform: Optional[str] = "spotify") -> Dict[str, Any]:
+    """
+    Busca y reproduce una canción, artista, álbum o playlist en Spotify o YouTube en la Laptop.
+    query: Nombre de la canción, artista o género (ej: 'Bad Bunny', 'Queen', 'música para programar', 'lofi beats').
+    platform: 'spotify' o 'youtube'.
+    """
+    res = await device_broker.send_command(
+        device_type="pc",
+        action="play_music",
+        params={"query": query, "platform": platform or "spotify"}
+    )
+    return res
+
+async def tool_open_website(url_or_query: str) -> Dict[str, Any]:
+    """
+    Abre una página web, servicio o búsqueda en el navegador de la PC (ej: 'youtube.com', 'chatgpt.com', 'whatsapp web', 'receta de lasagna').
+    """
+    res = await device_broker.send_command(
+        device_type="pc",
+        action="open_website",
+        params={"url_or_query": url_or_query}
+    )
+    return res
+
+async def tool_press_hotkey(keys_str: str) -> Dict[str, Any]:
+    """
+    Presiona una combinación de teclas o atajo en Windows (ej: 'win+d' para ver escritorio, 'alt+tab', 'ctrl+w' para cerrar pestaña).
+    """
+    res = await device_broker.send_command(
+        device_type="pc",
+        action="press_hotkey",
+        params={"keys_str": keys_str}
+    )
+    return res
+
 # ----------------- HERRAMIENTAS DE AUTO-APRENDIZAJE Y MEMORIA -----------------
 
 async def tool_learn_new_routine(routine_name: str, trigger_phrase: str, actions: List[Dict[str, Any]]) -> Dict[str, Any]:
@@ -290,6 +325,9 @@ TOOL_FUNCTIONS_MAP = {
     "open_pc_app": tool_open_pc_app,
     "set_pc_volume": tool_set_pc_volume,
     "control_pc_media": tool_control_pc_media,
+    "play_music": tool_play_music,
+    "open_website": tool_open_website,
+    "press_hotkey": tool_press_hotkey,
     "lock_pc": tool_lock_pc,
     "take_pc_screenshot_and_analyze": tool_take_pc_screenshot_and_analyze,
     "run_pc_command": tool_run_pc_command,

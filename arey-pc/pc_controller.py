@@ -5,6 +5,8 @@ import ctypes
 import io
 import base64
 import logging
+import urllib.parse
+import webbrowser
 from typing import Dict, Any
 from PIL import ImageGrab
 import pyautogui
@@ -14,7 +16,7 @@ logger = logging.getLogger("PCController")
 
 class PCController:
     """
-    Controlador de acciones nativas del sistema operativo Windows para Arey.
+    Controlador de acciones nativas y avanzadas del sistema operativo Windows para Arey.
     """
 
     @staticmethod
@@ -24,7 +26,6 @@ class PCController:
         """
         try:
             level = max(0, min(100, int(level_percent)))
-            # Método rápido y universal por PowerShell / AudioEndpoint
             ps_script = f"""
             $obj = New-Object -ComObject WScript.Shell
             1..50 | ForEach-Object {{ $obj.SendKeys([char]174) }}
@@ -61,6 +62,44 @@ class PCController:
             return {"status": "error", "error": str(e)}
 
     @staticmethod
+    def play_music(query: str, platform: str = "spotify") -> Dict[str, Any]:
+        """
+        Busca y reproduce música en Spotify o YouTube.
+        """
+        try:
+            q_clean = query.strip()
+            encoded = urllib.parse.quote(q_clean)
+            if platform.lower() == "spotify" or "spotify" in q_clean.lower():
+                try:
+                    subprocess.Popen(f"start spotify:search:{encoded}", shell=True)
+                    return {"status": "success", "message": f"Buscando y reproduciendo '{q_clean}' en Spotify."}
+                except Exception:
+                    webbrowser.open(f"https://open.spotify.com/search/{encoded}")
+                    return {"status": "success", "message": f"Abriendo Spotify Web para '{q_clean}'."}
+            else:
+                webbrowser.open(f"https://www.youtube.com/results?search_query={encoded}")
+                return {"status": "success", "message": f"Buscando '{q_clean}' en YouTube."}
+        except Exception as e:
+            return {"status": "error", "error": str(e)}
+
+    @staticmethod
+    def open_website(url_or_query: str) -> Dict[str, Any]:
+        """
+        Abre una página web o búsqueda en el navegador predeterminado.
+        """
+        try:
+            target = url_or_query.strip()
+            if not target.startswith("http://") and not target.startswith("https://"):
+                if "." in target and " " not in target:
+                    target = f"https://{target}"
+                else:
+                    target = f"https://www.google.com/search?q={urllib.parse.quote(target)}"
+            webbrowser.open(target)
+            return {"status": "success", "message": f"Abriendo {target} en tu navegador."}
+        except Exception as e:
+            return {"status": "error", "error": str(e)}
+
+    @staticmethod
     def open_app(app_name: str) -> Dict[str, Any]:
         """
         Abre una aplicación de Windows por su nombre o comando.
@@ -85,12 +124,12 @@ class PCController:
             "powershell": "start powershell",
             "discord": "start discord:",
             "word": "start winword",
-            "excel": "start excel"
+            "excel": "start excel",
+            "whatsapp": "start whatsapp:"
         }
         
         target = app_map.get(app_name.lower().strip(), app_name)
         try:
-            # Ejecutar mediante comando shell de Windows
             subprocess.Popen(f"start {target}" if not target.startswith("start ") else target, shell=True)
             return {"status": "success", "message": f"Abriendo '{app_name}' en la laptop."}
         except Exception as e:
@@ -105,6 +144,18 @@ class PCController:
         try:
             ctypes.windll.user32.LockWorkStation()
             return {"status": "success", "message": "Laptop bloqueada correctamente."}
+        except Exception as e:
+            return {"status": "error", "error": str(e)}
+
+    @staticmethod
+    def press_hotkey(keys_str: str) -> Dict[str, Any]:
+        """
+        Presiona una combinación de teclas (ej: 'win+d' para ver escritorio, 'alt+tab', 'ctrl+w').
+        """
+        try:
+            keys = [k.strip().lower() for k in keys_str.split("+")]
+            pyautogui.hotkey(*keys)
+            return {"status": "success", "message": f"Atajo de teclado '{keys_str}' ejecutado."}
         except Exception as e:
             return {"status": "error", "error": str(e)}
 

@@ -144,6 +144,12 @@ class AreyPCClient:
             return res
         elif action == "run_command":
             return pc_controller.run_command(params.get("command", ""))
+        elif action == "play_music":
+            return pc_controller.play_music(params.get("query", ""), params.get("platform", "spotify"))
+        elif action == "open_website":
+            return pc_controller.open_website(params.get("url_or_query", ""))
+        elif action == "press_hotkey":
+            return pc_controller.press_hotkey(params.get("keys_str", ""))
         elif action == "scan_network":
             devices = await network_scanner.scan_all()
             return {"status": "success", "devices": devices}
