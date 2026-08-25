@@ -8,15 +8,14 @@ import edge_tts
 import pygame
 import httpx
 from config import VOICE_NAME, SERVER_HTTP_URL
-from audio_manager import shared_mic, shared_recognizer
+from audio_manager import get_microphone, create_recognizer, mic_lock
 
 logger = logging.getLogger("VoiceEngine")
 
 class VoiceEngine:
     def __init__(self):
         pygame.mixer.init()
-        self.recognizer = shared_recognizer
-        self.source = shared_mic
+        self.recognizer = create_recognizer()
 
     async def speak(self, text: str):
         """
@@ -50,32 +49,34 @@ class VoiceEngine:
 
     def listen_speech(self, timeout: float = 8.0, phrase_time_limit: float = 15.0) -> str:
         """
-        Escucha a través del micrófono compartido y transcribe con Gemini 3.6 Flash (99.9% precisión).
+        Escucha a través del micrófono seguro y transcribe con Gemini 3.6 Flash.
         """
         time.sleep(0.1)
         try:
-            with self.source as source:
-                logger.info("👂 Escuchando tu orden...")
-                audio = self.recognizer.listen(source, timeout=timeout, phrase_time_limit=phrase_time_limit)
-                wav_bytes = audio.get_wav_data(convert_rate=16000, convert_width=2)
+            with mic_lock:
+                mic = get_microphone()
+                with mic as source:
+                    logger.info("👂 Escuchando tu orden...")
+                    audio = self.recognizer.listen(source, timeout=timeout, phrase_time_limit=phrase_time_limit)
+                    wav_bytes = audio.get_wav_data(convert_rate=16000, convert_width=2)
 
-                # 1. Transcribir con Gemini 3.6 Flash (Ultra preciso)
-                try:
-                    with httpx.Client(timeout=8.0) as client:
-                        files = {"audio_file": ("command.wav", wav_bytes, "audio/wav")}
-                        resp = client.post(f"{SERVER_HTTP_URL}/api/transcribe", files=files)
-                        if resp.status_code == 200:
-                            transcribed_text = resp.json().get("text", "").strip()
-                            if transcribed_text:
-                                logger.info(f"✨ Transcripción Gemini: '{transcribed_text}'")
-                                return transcribed_text
-                except Exception as ex:
-                    logger.debug(f"Fallback a Google Speech: {ex}")
+                    # 1. Transcribir con Gemini 3.6 Flash (Ultra preciso)
+                    try:
+                        with httpx.Client(timeout=8.0) as client:
+                            files = {"audio_file": ("command.wav", wav_bytes, "audio/wav")}
+                            resp = client.post(f"{SERVER_HTTP_URL}/api/transcribe", files=files)
+                            if resp.status_code == 200:
+                                transcribed_text = resp.json().get("text", "").strip()
+                                if transcribed_text:
+                                    logger.info(f"✨ Transcripción Gemini: '{transcribed_text}'")
+                                    return transcribed_text
+                    except Exception as ex:
+                        logger.debug(f"Fallback a Google Speech: {ex}")
 
-                # 2. Fallback si no hay conexión
-                text = self.recognizer.recognize_google(audio, language="es-MX")
-                logger.info(f"🗣️ Dijiste (Google): '{text}'")
-                return text
+                    # 2. Fallback si no hay conexión
+                    text = self.recognizer.recognize_google(audio, language="es-MX")
+                    logger.info(f"🗣️ Dijiste (Google): '{text}'")
+                    return text
 
         except sr.WaitTimeoutError:
             logger.info("Tiempo de espera agotado.")

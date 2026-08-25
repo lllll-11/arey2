@@ -23,6 +23,9 @@ class AreyPCClient:
 
     async def start(self):
         logger.info(f"Iniciando Agente de Laptop Arey. Conectando a {SERVER_WS_URL}...")
+        # Iniciar el bucle de escucha de voz permanente (una sola vez)
+        asyncio.create_task(self._voice_loop())
+
         while self.running:
             try:
                 # Conectar al WebSocket del Servidor Arey
@@ -37,14 +40,12 @@ class AreyPCClient:
                     # Enviar estado inicial del sistema
                     await self._send_status()
 
-                    # Ejecutar tareas concurrentes: receptor de comandos, escucha de voz y telemetría
+                    # Ejecutar tareas concurrentes de red: receptor y telemetría
                     listener_task = asyncio.create_task(self._listen_server_messages())
                     telemetry_task = asyncio.create_task(self._telemetry_loop())
-                    voice_task = asyncio.create_task(self._voice_loop())
 
-                    # Esperar hasta que alguna tarea falle o la conexión se cierre
                     done, pending = await asyncio.wait(
-                        [listener_task, telemetry_task, voice_task],
+                        [listener_task, telemetry_task],
                         return_when=asyncio.FIRST_EXCEPTION
                     )
                     for task in pending:

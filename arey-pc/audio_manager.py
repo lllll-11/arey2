@@ -1,24 +1,29 @@
+import threading
 import speech_recognition as sr
 import logging
 
 logger = logging.getLogger("AreyAudio")
 
-def get_best_microphone():
+# Mutex para garantizar que el micrófono nunca se acceda simultáneamente por dos hilos
+mic_lock = threading.Lock()
+
+def get_microphone():
     """
-    Detecta automáticamente el mejor índice de micrófono físico Realtek / Windows.
+    Retorna una instancia limpia del micrófono físico Realtek / Windows.
     """
     try:
         names = sr.Microphone.list_microphone_names()
         for idx, name in enumerate(names):
             if "mic" in name.lower() and "realtek" in name.lower():
-                logger.info(f"Usando micrófono físico: [{idx}] {name}")
                 return sr.Microphone(device_index=idx)
     except Exception:
         pass
     return sr.Microphone()
 
-shared_mic = get_best_microphone()
-shared_recognizer = sr.Recognizer()
-shared_recognizer.energy_threshold = 200
-shared_recognizer.dynamic_energy_threshold = True
-shared_recognizer.pause_threshold = 0.6
+def create_recognizer():
+    r = sr.Recognizer()
+    r.energy_threshold = 220
+    r.dynamic_energy_threshold = True
+    r.dynamic_energy_adjustment_damping = 0.15
+    r.pause_threshold = 0.7
+    return r
