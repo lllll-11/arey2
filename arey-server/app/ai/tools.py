@@ -203,6 +203,30 @@ async def tool_run_pc_command(command_or_script: str) -> Dict[str, Any]:
     )
     return res
 
+async def tool_scan_network_devices() -> Dict[str, Any]:
+    """
+    Escanea la red WiFi local en busca de Smart TVs (Roku, LG, Samsung), bocinas y dispositivos inteligentes.
+    """
+    res = await device_broker.send_command(
+        device_type="pc",
+        action="scan_network",
+        timeout=8.0
+    )
+    return res
+
+async def tool_control_smart_tv(command: str, app_name: Optional[str] = None) -> Dict[str, Any]:
+    """
+    Controla la Smart TV conectada a la red WiFi (encender, apagar, volumen, silenciar, pausar, abrir Netflix/YouTube).
+    command: 'power', 'play', 'pause', 'play_pause', 'volume_up', 'volume_down', 'mute', 'home', 'launch_app'
+    app_name: 'netflix', 'youtube', 'spotify', 'prime video' (si command es 'launch_app')
+    """
+    res = await device_broker.send_command(
+        device_type="pc",
+        action="control_tv",
+        params={"command": command, "app_name": app_name}
+    )
+    return res
+
 # ----------------- HERRAMIENTAS DE AUTO-APRENDIZAJE Y MEMORIA -----------------
 
 async def tool_learn_new_routine(routine_name: str, trigger_phrase: str, actions: List[Dict[str, Any]]) -> Dict[str, Any]:
@@ -269,6 +293,8 @@ TOOL_FUNCTIONS_MAP = {
     "lock_pc": tool_lock_pc,
     "take_pc_screenshot_and_analyze": tool_take_pc_screenshot_and_analyze,
     "run_pc_command": tool_run_pc_command,
+    "scan_network_devices": tool_scan_network_devices,
+    "control_smart_tv": tool_control_smart_tv,
     "learn_new_routine": tool_learn_new_routine,
     "save_personal_fact": tool_save_personal_fact,
     "search_web_live": tool_search_web_live,

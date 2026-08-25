@@ -8,6 +8,8 @@ from config import SERVER_WS_URL, DEVICE_AUTH_TOKEN
 from pc_controller import pc_controller
 from voice_engine import voice_engine
 from wake_word import wake_detector
+from network_scanner import network_scanner
+from tv_controller import tv_controller
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] AreyPC: %(message)s")
 logger = logging.getLogger("AreyPCClient")
@@ -124,6 +126,18 @@ class AreyPCClient:
             return res
         elif action == "run_command":
             return pc_controller.run_command(params.get("command", ""))
+        elif action == "scan_network":
+            devices = await network_scanner.scan_all()
+            return {"status": "success", "devices": devices}
+        elif action == "control_tv":
+            cmd = params.get("command", "play_pause")
+            app_name = params.get("app_name")
+            # Buscar Smart TV en la red
+            devices = await network_scanner.scan_all()
+            tv = next((d for d in devices if "tv" in d.get("type", "").lower() or d.get("protocol") == "roku_ecp"), None)
+            if tv:
+                return await tv_controller.send_tv_command(tv, cmd, extra=app_name)
+            return {"status": "error", "message": "No se encontró ninguna Smart TV activa en la red WiFi."}
         else:
             return {"status": "error", "message": f"Acción '{action}' no soportada en PC."}
 
