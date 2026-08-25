@@ -31,7 +31,7 @@ class VoiceEngine:
             with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as fp:
                 temp_audio_path = fp.name
 
-            communicate = edge_tts.Communicate(text, voice=VOICE_NAME)
+            communicate = edge_tts.Communicate(text, voice=VOICE_NAME, rate="+6%", pitch="+0Hz")
             await communicate.save(temp_audio_path)
 
             # Reproducir audio con pygame
