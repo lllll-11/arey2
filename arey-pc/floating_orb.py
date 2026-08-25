@@ -60,14 +60,24 @@ class FloatingAreyOrb(QWidget):
             self.tick = 0.0
         self.update()
 
-    # ==================== EVENTOS DE RATÓN (ARRASTRAR Y SOLTAR) ====================
-
     def mousePressEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:
             self.drag_position = event.globalPosition().toPoint() - self.frameGeometry().topLeft()
+            self.press_time = time.time()
             event.accept()
         elif event.button() == Qt.MouseButton.RightButton:
             self._show_context_menu(event.globalPosition().toPoint())
+
+    def mouseReleaseEvent(self, event):
+        if event.button() == Qt.MouseButton.LeftButton:
+            # Si fue un clic corto (sin arrastrar), activar escucha
+            if hasattr(self, 'press_time') and (time.time() - self.press_time) < 0.25:
+                try:
+                    from wake_word import wake_detector
+                    wake_detector.trigger_manually()
+                except Exception:
+                    pass
+            event.accept()
 
     def mouseMoveEvent(self, event):
         if event.buttons() == Qt.MouseButton.LeftButton:

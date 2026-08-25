@@ -22,8 +22,9 @@ def get_microphone():
 
 def create_recognizer():
     r = sr.Recognizer()
-    r.energy_threshold = 220
-    r.dynamic_energy_threshold = True
-    r.dynamic_energy_adjustment_damping = 0.15
-    r.pause_threshold = 0.7
+    # Sensibilidad óptima para capturar voz humana normal
+    r.energy_threshold = 90
+    r.dynamic_energy_threshold = False
+    r.pause_threshold = 0.5
+    r.non_speaking_duration = 0.3
     return r
