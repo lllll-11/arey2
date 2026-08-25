@@ -160,32 +160,48 @@ class AreyPCClient:
 
     async def _voice_loop(self):
         """
-        Bucle de escucha continua: SOLO se activa cuando el usuario dice estrictamente 'Arey'.
+        Bucle de escucha continua: SOLO se activa cuando el usuario dice 'Arey'.
         """
         loop = asyncio.get_running_loop()
         while self.running:
-            # 1. Esperar estrictamente la palabra 'Arey'
             state_bridge.state_changed.emit("idle")
+            # 1. Esperar la palabra 'Arey'
             detected = await loop.run_in_executor(executor, wake_detector.listen_for_wake_word)
-            if detected:
-                # Activar animación de escucha en el orbe
-                state_bridge.state_changed.emit("listening")
-                # Sonido de confirmación instantáneo
-                voice_engine.play_instant_wake()
+            if not detected:
+                continue
 
-                # 2. Escuchar y transcribir con Whisper neuronal local (150ms)
-                user_text = await loop.run_in_executor(executor, voice_engine.listen_speech)
-                if user_text:
-                    logger.info(f"Enviando consulta al cerebro de Arey: '{user_text}'")
-                    # Activar animación de pensando / procesando
-                    state_bridge.state_changed.emit("thinking")
-                    if self.ws:
-                        await self.ws.send(json.dumps({
-                            "type": "voice_command",
-                            "text": user_text
-                        }))
-                else:
-                    state_bridge.state_changed.emit("idle")
+            # 2. Confirmar y escuchar la orden
+            state_bridge.state_changed.emit("listening")
+            voice_engine.play_instant_wake()
+
+            user_text = await loop.run_in_executor(executor, voice_engine.listen_speech)
+            logger.info(f"==> Texto transcrito: '{user_text}'")
+
+            if not user_text or not user_text.strip():
+                logger.warning("No se transcribió texto. Volviendo a escuchar...")
+                state_bridge.state_changed.emit("idle")
+                continue
+
+            # 3. Enviar al cerebro
+            state_bridge.state_changed.emit("thinking")
+
+            if not self.ws:
+                logger.warning("Sin conexión al servidor. Reintentando en 2s...")
+                await asyncio.sleep(2)
+                state_bridge.state_changed.emit("idle")
+                continue
+
+            try:
+                logger.info(f"==> Enviando al cerebro: '{user_text}'")
+                await self.ws.send(json.dumps({
+                    "type": "voice_command",
+                    "text": user_text
+                }))
+                logger.info("==> Mensaje enviado. Esperando respuesta...")
+            except Exception as e:
+                logger.error(f"Error enviando mensaje: {e}")
+                state_bridge.state_changed.emit("idle")
+
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
