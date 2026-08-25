@@ -1,64 +1,75 @@
 import sys
 import math
 import time
-from PyQt6.QtCore import Qt, QTimer, QPoint, pyqtSignal, QObject
-from PyQt6.QtWidgets import QApplication, QWidget, QMenu
-from PyQt6.QtGui import QPainter, QColor, QRadialGradient, QLinearGradient, QBrush, QPen, QPainterPath
+from PyQt6.QtCore import Qt, QTimer, QPoint, pyqtSignal, QObject, QRectF
+from PyQt6.QtWidgets import QApplication, QWidget, QMenu, QLabel, QVBoxLayout
+from PyQt6.QtGui import QPainter, QColor, QPen, QPainterPath, QFont, QLinearGradient, QBrush
 
 class OrbStateBridge(QObject):
-    state_changed = pyqtSignal(str) # 'idle', 'listening', 'thinking', 'speaking'
+    state_changed = pyqtSignal(str)  # 'idle', 'listening', 'thinking', 'speaking'
 
 state_bridge = OrbStateBridge()
 
+# Paleta de colores
+BG_COLOR       = QColor(28, 28, 32)       # Fondo gris oscuro
+BORDER_COLOR   = QColor(70, 70, 85)       # Borde gris delgado
+BORDER_ACTIVE  = QColor(130, 130, 160)    # Borde iluminado activo
+TEXT_COLOR     = QColor(190, 190, 205)    # Texto sutil
+LINE_IDLE      = QColor(80, 90, 120)      # Línea reposo: azul grisáceo
+LINE_LISTEN    = QColor(0, 220, 160)      # Línea escuchando: verde esmeralda
+LINE_THINK     = QColor(80, 160, 255)     # Línea pensando: azul eléctrico
+LINE_SPEAK     = QColor(200, 100, 255)    # Línea hablando: morado vivo
+
+LABEL_MAP = {
+    "idle":      "Reposo",
+    "listening": "Escuchando...",
+    "thinking":  "Procesando...",
+    "speaking":  "Hablando..."
+}
+
 class FloatingAreyOrb(QWidget):
     """
-    Widget flotante circular con animaciones fluidas a 60 FPS.
-    Estados:
-      - 'idle': Respiración sutil en azul/morado neón.
-      - 'listening': Ondas acústicas expansivas verdes/cian brillantes mientras escucha.
-      - 'thinking': Giro orbital acelerado mientras Gemini procesa.
-      - 'speaking': Ondas vocales orgánicas fluidas mientras Arey habla.
+    Widget flotante cuadrado con ondas de sonido animadas.
     """
     def __init__(self):
         super().__init__()
-        self.state = "idle" # 'idle', 'listening', 'thinking', 'speaking'
+        self.state = "idle"
         self.tick = 0.0
         self.drag_position = QPoint()
+        self.press_time = 0.0
 
-        # Configuración de ventana flotante transparente sin bordes
+        # --- Ventana flotante sin bordes del sistema ---
         self.setWindowFlags(
             Qt.WindowType.FramelessWindowHint |
             Qt.WindowType.WindowStaysOnTopHint |
-            Qt.WindowType.SubWindow
+            Qt.WindowType.Tool
         )
-        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
-        self.setAttribute(Qt.WidgetAttribute.WA_NoSystemBackground, True)
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, False)
+        self.setFixedSize(180, 130)
 
-        # Dimensiones del widget
-        self.size_px = 120
-        self.resize(self.size_px, self.size_px)
-
-        # Posicionar en la esquina inferior derecha de la pantalla
+        # Posición: esquina inferior derecha
         screen = QApplication.primaryScreen().geometry()
-        self.move(screen.width() - self.size_px - 35, screen.height() - self.size_px - 85)
+        self.move(screen.width() - 210, screen.height() - 180)
 
-        # Temporizador de animación a 60 FPS (16ms)
+        # Animación a 60 FPS
         self.anim_timer = QTimer(self)
-        self.anim_timer.timeout.connect(self._animate_step)
+        self.anim_timer.timeout.connect(self._tick)
         self.anim_timer.start(16)
 
-        # Conectar puente de estados
-        state_bridge.state_changed.connect(self.set_state_slot)
+        # Conectar cambio de estado
+        state_bridge.state_changed.connect(self._on_state_changed)
 
-    def set_state_slot(self, new_state: str):
+    def _on_state_changed(self, new_state: str):
         self.state = new_state
         self.update()
 
-    def _animate_step(self):
-        self.tick += 0.05
-        if self.tick > 100000:
+    def _tick(self):
+        self.tick += 0.045
+        if self.tick > 1e6:
             self.tick = 0.0
         self.update()
+
+    # ─────────────── Ratón ───────────────
 
     def mousePressEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:
@@ -70,8 +81,7 @@ class FloatingAreyOrb(QWidget):
 
     def mouseReleaseEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:
-            # Si fue un clic corto (sin arrastrar), activar escucha
-            if hasattr(self, 'press_time') and (time.time() - self.press_time) < 0.25:
+            if (time.time() - self.press_time) < 0.25:
                 try:
                     from wake_word import wake_detector
                     wake_detector.trigger_manually()
@@ -88,182 +98,180 @@ class FloatingAreyOrb(QWidget):
         menu = QMenu(self)
         menu.setStyleSheet("""
             QMenu {
-                background-color: #1e1e2e;
-                color: #cdd6f4;
-                border: 1px solid #45475a;
-                border-radius: 8px;
-                padding: 4px;
+                background-color: #1c1c20;
+                color: #bebebd;
+                border: 1px solid #46465a;
+                border-radius: 6px;
+                padding: 3px;
                 font-family: 'Segoe UI', sans-serif;
                 font-size: 12px;
             }
-            QMenu::item {
-                padding: 6px 16px;
-                border-radius: 4px;
-            }
-            QMenu::item:selected {
-                background-color: #313244;
-                color: #89b4fa;
-            }
+            QMenu::item { padding: 5px 14px; border-radius: 3px; }
+            QMenu::item:selected { background-color: #2e2e3a; color: #8ab4fa; }
         """)
-        action_idle = menu.addAction("💤 Estado: Reposo")
-        action_idle.triggered.connect(lambda: state_bridge.state_changed.emit("idle"))
-        action_listen = menu.addAction("🎤 Estado: Escuchando")
-        action_listen.triggered.connect(lambda: state_bridge.state_changed.emit("listening"))
-        action_speak = menu.addAction("🗣️ Estado: Hablando")
-        action_speak.triggered.connect(lambda: state_bridge.state_changed.emit("speaking"))
-        menu.addSeparator()
-        action_exit = menu.addAction("❌ Ocultar Widget")
-        action_exit.triggered.connect(self.hide)
+        menu.addAction("Ocultar").triggered.connect(self.hide)
         menu.exec(pos)
 
-    # ==================== DIBUJADO DE ANIMACIONES FLUIDAS ====================
+    # ─────────────── Dibujo ───────────────
 
     def paintEvent(self, event):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
-        painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform, True)
 
-        center_x = self.width() / 2.0
-        center_y = self.height() / 2.0
-        base_radius = 28.0
-
+        w, h = self.width(), self.height()
         t = self.tick
 
-        # ----------------- 1. ESTADO: LISTENING (ESCUCHANDO - ONDAS EXPANSIVAS CIAN/ESMERALDA) -----------------
-        if self.state == "listening":
-            # Ondas concéntricas expansivas pulsantes
-            for i in range(3):
-                wave_t = (t * 1.5 + i * 1.0) % 3.0
-                wave_radius = base_radius + (wave_t * 16.0)
-                alpha = int(max(0, min(220, (1.0 - (wave_t / 3.0)) * 220)))
-                
-                pen = QPen(QColor(0, 255, 180, alpha), 2.5)
-                painter.setPen(pen)
-                painter.setBrush(Qt.BrushStyle.NoBrush)
-                painter.drawEllipse(QPoint(int(center_x), int(center_y)), int(wave_radius), int(wave_radius))
+        # 1. Fondo gris oscuro con esquinas redondeadas
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(BG_COLOR)
+        painter.drawRoundedRect(0, 0, w, h, 10, 10)
 
-            # Núcleo brillante activo
-            glow_radius = base_radius + math.sin(t * 5.0) * 3.5
-            grad = QRadialGradient(center_x, center_y, glow_radius)
-            grad.setColorAt(0.0, QColor(0, 255, 200, 255))
-            grad.setColorAt(0.5, QColor(0, 180, 240, 230))
-            grad.setColorAt(0.9, QColor(0, 100, 200, 150))
-            grad.setColorAt(1.0, QColor(0, 50, 150, 0))
+        # 2. Borde del cuadrado
+        is_active = self.state != "idle"
+        border_col = BORDER_ACTIVE if is_active else BORDER_COLOR
+        pen_border = QPen(border_col, 1.5)
+        painter.setPen(pen_border)
+        painter.setBrush(Qt.BrushStyle.NoBrush)
+        painter.drawRoundedRect(1, 1, w - 2, h - 2, 9, 9)
 
-            painter.setPen(Qt.PenStyle.NoPen)
-            painter.setBrush(QBrush(grad))
-            painter.drawEllipse(QPoint(int(center_x), int(center_y)), int(glow_radius + 4), int(glow_radius + 4))
+        # 3. Zona de ondas (ocupa el 75% superior del widget)
+        wave_top    = 14
+        wave_bottom = int(h * 0.80)
+        wave_mid    = (wave_top + wave_bottom) // 2
+        margin      = 18
 
-            # Centro blanco vibrante
-            inner_pen = QPen(QColor(255, 255, 255, 240), 2.0)
-            painter.setPen(inner_pen)
-            painter.setBrush(QColor(255, 255, 255, 180))
-            painter.drawEllipse(QPoint(int(center_x), int(center_y)), 10, 10)
+        self._draw_waves(painter, t, margin, wave_top, w - margin, wave_bottom, wave_mid)
 
-        # ----------------- 2. ESTADO: SPEAKING (HABLANDO - ONDAS VOCALES MORADAS/ROSA) -----------------
-        elif self.state == "speaking":
-            # Ondas vocales dinámicas multidimensionales
-            for i in range(4):
-                freq = 3.0 + i * 1.5
-                radius_var = math.sin(t * freq + i) * 6.0
-                wave_r = base_radius + 8.0 + radius_var
-                
-                alpha = int(140 - i * 30)
-                pen = QPen(QColor(180, 100, 255, alpha), 2.0)
-                painter.setPen(pen)
-                painter.setBrush(Qt.BrushStyle.NoBrush)
-                painter.drawEllipse(QPoint(int(center_x), int(center_y)), int(wave_r + i * 4), int(wave_r + i * 4))
+        # 4. Etiqueta de estado
+        self._draw_label(painter, w, h)
 
-            # Gradiente de voz estilo Siri / Jarvis
-            grad = QRadialGradient(center_x, center_y, base_radius + 6.0)
-            grad.setColorAt(0.0, QColor(255, 110, 180, 255))
-            grad.setColorAt(0.4, QColor(160, 60, 255, 230))
-            grad.setColorAt(0.8, QColor(80, 30, 200, 180))
-            grad.setColorAt(1.0, QColor(40, 10, 120, 0))
+    def _get_wave_color(self):
+        return {
+            "idle":      LINE_IDLE,
+            "listening": LINE_LISTEN,
+            "thinking":  LINE_THINK,
+            "speaking":  LINE_SPEAK,
+        }.get(self.state, LINE_IDLE)
 
-            painter.setPen(Qt.PenStyle.NoPen)
-            painter.setBrush(QBrush(grad))
-            pulse = math.sin(t * 8.0) * 4.0
-            painter.drawEllipse(QPoint(int(center_x), int(center_y)), int(base_radius + pulse), int(base_radius + pulse))
+    def _draw_waves(self, painter, t, x_left, y_top, x_right, y_bottom, y_mid):
+        color     = self._get_wave_color()
+        amplitude = (y_bottom - y_top) / 2.0 - 2
+        width_px  = x_right - x_left
+        state     = self.state
 
-            # Partículas orbitales de voz
-            for p in range(5):
-                angle = (t * 4.0 + p * (2 * math.pi / 5))
-                px = center_x + math.cos(angle) * (base_radius + 2)
-                py = center_y + math.sin(angle) * (base_radius + 2)
-                painter.setBrush(QColor(255, 255, 255, 230))
-                painter.drawEllipse(QPoint(int(px), int(py)), 3, 3)
+        # Configuración de líneas según estado
+        configs = {
+            "idle": [
+                # (fase, amplitud_factor, grosor, alpha, freq)
+                (0.0,  0.22, 2.0, 90,  1.0),
+                (1.1,  0.12, 1.3, 55,  1.0),
+                (-0.8, 0.08, 1.0, 35,  1.0),
+            ],
+            "listening": [
+                (0.0,  0.85, 3.5, 255, 1.0),
+                (0.7,  0.55, 2.5, 180, 1.3),
+                (-0.5, 0.30, 1.8, 110, 0.7),
+                (1.4,  0.18, 1.2, 65,  1.6),
+            ],
+            "thinking": [
+                (0.0,  0.60, 2.8, 230, 2.5),
+                (0.9,  0.45, 2.0, 160, 3.0),
+                (-0.7, 0.25, 1.5, 100, 1.8),
+            ],
+            "speaking": [
+                (0.0,  1.0,  4.0, 255, 1.0),
+                (0.5,  0.70, 3.0, 200, 1.8),
+                (-0.4, 0.45, 2.2, 140, 2.4),
+                (1.1,  0.25, 1.5, 80,  0.6),
+                (-1.2, 0.15, 1.0, 50,  3.2),
+            ],
+        }.get(state, [
+            (0.0, 0.22, 2.0, 90, 1.0),
+        ])
 
-        # ----------------- 3. ESTADO: THINKING (PROCESANDO - GIRO ORBITAL) -----------------
-        elif self.state == "thinking":
-            # Anillo de rotación de luz
-            orbit_radius = base_radius + 8.0
-            pen = QPen(QColor(100, 150, 255, 80), 2.0)
+        # Modulación de amplitud global en vivo
+        if state == "idle":
+            amp_mod = 0.8 + 0.2 * math.sin(t * 1.5)
+        elif state == "listening":
+            amp_mod = 0.8 + 0.2 * math.sin(t * 6.0) + 0.1 * math.sin(t * 13.0)
+        elif state == "thinking":
+            amp_mod = 0.7 + 0.3 * abs(math.sin(t * 8.0))
+        else:  # speaking
+            amp_mod = 0.7 + 0.3 * math.sin(t * 9.0) + 0.15 * math.sin(t * 17.0)
+
+        n_points = 120
+
+        for phase, amp_factor, thickness, alpha, freq in configs:
+            path = QPainterPath()
+            for i in range(n_points + 1):
+                x = x_left + (i / n_points) * width_px
+                # Onda sinusoidal con variación de armónicos
+                y_offset = (
+                    amplitude * amp_factor * amp_mod *
+                    math.sin(freq * 2 * math.pi * (i / n_points) * 2.5 + t * 4.5 + phase)
+                )
+                if state == "speaking":
+                    y_offset += (
+                        amplitude * amp_factor * amp_mod * 0.3 *
+                        math.sin(freq * 2 * math.pi * (i / n_points) * 5.0 - t * 7.0 + phase)
+                    )
+                y = y_mid + y_offset
+                if i == 0:
+                    path.moveTo(x, y)
+                else:
+                    path.lineTo(x, y)
+
+            line_color = QColor(color)
+            line_color.setAlpha(alpha)
+            pen = QPen(line_color, thickness, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap)
             painter.setPen(pen)
             painter.setBrush(Qt.BrushStyle.NoBrush)
-            painter.drawEllipse(QPoint(int(center_x), int(center_y)), int(orbit_radius), int(orbit_radius))
+            painter.drawPath(path)
 
-            # Satélites giratorios rápidos
-            for s in range(3):
-                angle = t * 6.0 + s * (2 * math.pi / 3)
-                sx = center_x + math.cos(angle) * orbit_radius
-                sy = center_y + math.sin(angle) * orbit_radius
-                painter.setPen(Qt.PenStyle.NoPen)
-                painter.setBrush(QColor(0, 230, 255, 240))
-                painter.drawEllipse(QPoint(int(sx), int(sy)), 4, 4)
+    def _draw_label(self, painter, w, h):
+        label_text = LABEL_MAP.get(self.state, "")
+        color = self._get_wave_color()
+        label_color = QColor(color)
+        label_color.setAlpha(210)
 
-            # Núcleo pulsante azul
-            grad = QRadialGradient(center_x, center_y, base_radius)
-            grad.setColorAt(0.0, QColor(0, 180, 255, 240))
-            grad.setColorAt(0.6, QColor(30, 60, 180, 180))
-            grad.setColorAt(1.0, QColor(10, 20, 80, 0))
-            painter.setBrush(QBrush(grad))
-            painter.drawEllipse(QPoint(int(center_x), int(center_y)), int(base_radius), int(base_radius))
+        font = QFont("Segoe UI", 8)
+        font.setLetterSpacing(QFont.SpacingType.AbsoluteSpacing, 1.0)
+        painter.setFont(font)
+        painter.setPen(label_color)
 
-        # ----------------- 4. ESTADO: IDLE (REPOSO - RESPIRACIÓN AZUL SUAVE) -----------------
-        else: # 'idle'
-            # Suave halo exterior respirando lentamente
-            breath = math.sin(t * 2.0) * 3.0
-            halo_radius = base_radius + 10.0 + breath
-            grad_halo = QRadialGradient(center_x, center_y, halo_radius)
-            grad_halo.setColorAt(0.0, QColor(100, 130, 255, 90))
-            grad_halo.setColorAt(0.7, QColor(60, 40, 180, 40))
-            grad_halo.setColorAt(1.0, QColor(20, 10, 80, 0))
+        painter.drawText(
+            QRectF(0, h - 22, w, 18),
+            Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignVCenter,
+            label_text
+        )
 
-            painter.setPen(Qt.PenStyle.NoPen)
-            painter.setBrush(QBrush(grad_halo))
-            painter.drawEllipse(QPoint(int(center_x), int(center_y)), int(halo_radius), int(halo_radius))
+        # Nombre "Arey" en gris tenue arriba
+        font_title = QFont("Segoe UI", 7)
+        painter.setFont(font_title)
+        painter.setPen(QColor(100, 100, 115, 180))
+        painter.drawText(
+            QRectF(0, 2, w, 13),
+            Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignVCenter,
+            "AREY"
+        )
 
-            # Núcleo principal de cristal neón
-            grad_core = QRadialGradient(center_x, center_y, base_radius)
-            grad_core.setColorAt(0.0, QColor(120, 180, 255, 230))
-            grad_core.setColorAt(0.5, QColor(70, 90, 220, 200))
-            grad_core.setColorAt(0.85, QColor(30, 30, 120, 170))
-            grad_core.setColorAt(1.0, QColor(10, 10, 60, 0))
-
-            painter.setBrush(QBrush(grad_core))
-            painter.drawEllipse(QPoint(int(center_x), int(center_y)), int(base_radius), int(base_radius))
-
-            # Borde sutil brillante
-            pen_border = QPen(QColor(180, 220, 255, 120), 1.5)
-            painter.setPen(pen_border)
-            painter.setBrush(Qt.BrushStyle.NoBrush)
-            painter.drawEllipse(QPoint(int(center_x), int(center_y)), int(base_radius), int(base_radius))
-
-            # Pequeño destello de luz interior
-            painter.setPen(Qt.PenStyle.NoPen)
-            painter.setBrush(QColor(255, 255, 255, 190))
-            painter.drawEllipse(QPoint(int(center_x - 7), int(center_y - 7)), 3, 3)
 
 def run_floating_orb_app():
-    """
-    Función de arranque de la interfaz gráfica flotante.
-    """
     app = QApplication(sys.argv)
     orb = FloatingAreyOrb()
     orb.show()
     return app, orb
 
+
 if __name__ == "__main__":
     app, orb = run_floating_orb_app()
+    # Demostración de estados para previsualización
+    states = ["idle", "listening", "thinking", "speaking"]
+    idx = [0]
+    def cycle():
+        state_bridge.state_changed.emit(states[idx[0] % len(states)])
+        idx[0] += 1
+    timer = QTimer()
+    timer.timeout.connect(cycle)
+    timer.start(2200)
     sys.exit(app.exec())
