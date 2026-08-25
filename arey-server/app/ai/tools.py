@@ -1,6 +1,6 @@
 import json
 import logging
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 import httpx
 from app.devices.broker import device_broker
 from app.ai.memory import memory_manager
