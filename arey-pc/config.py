@@ -3,9 +3,9 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# Dirección del Servidor Arey (en local o en la nube gratuita ej: wss://tu-espacio.hf.space)
-SERVER_WS_URL = os.getenv("AREY_SERVER_WS_URL", "ws://localhost:8000/ws/device/pc")
-SERVER_HTTP_URL = os.getenv("AREY_SERVER_HTTP_URL", "http://localhost:8000")
+# Dirección del Servidor Arey en la Nube 24/7 (Render)
+SERVER_WS_URL = os.getenv("AREY_SERVER_WS_URL", "wss://arey2-1.onrender.com/ws/device/pc")
+SERVER_HTTP_URL = os.getenv("AREY_SERVER_HTTP_URL", "https://arey2-1.onrender.com")
 DEVICE_AUTH_TOKEN = os.getenv("DEVICE_AUTH_TOKEN", "arey-secret-token-2026")
 
 # Configuración de Voz
