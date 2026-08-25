@@ -2,8 +2,11 @@ import sys
 import os
 import math
 import time
+import logging
 import keyboard
 from PyQt6.QtCore import Qt, QTimer, QPoint, pyqtSignal, QObject, QRectF, QSize
+
+logger = logging.getLogger("FloatingUI")
 from PyQt6.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QHBoxLayout, QLabel, 
     QPushButton, QFrame, QGraphicsDropShadowEffect, QMenu
