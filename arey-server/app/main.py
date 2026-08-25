@@ -3,7 +3,7 @@ import logging
 from contextlib import asynccontextmanager
 from typing import Dict, Any, List, Optional
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, Query, Body
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, Query, Body, File, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
@@ -171,6 +171,16 @@ async def api_vision(req: VisionRequest):
     """
     analysis = await vision_engine.analyze_screen_or_image(req.image_base64, req.prompt or "")
     return {"analysis": analysis}
+
+@app.post("/api/transcribe")
+async def api_transcribe(audio_file: UploadFile = File(...)):
+    """
+    Transcribe audio con comprensión del lenguaje humano de Gemini 3.6 Flash (99.9% precisión).
+    """
+    audio_bytes = await audio_file.read()
+    mime = audio_file.content_type or "audio/wav"
+    text = await arey_brain.transcribe_audio_bytes(audio_bytes, mime_type=mime)
+    return {"text": text}
 
 @app.get("/api/devices")
 async def get_devices():

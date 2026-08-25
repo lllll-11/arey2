@@ -149,22 +149,18 @@ class AreyPCClient:
 
     async def _voice_loop(self):
         """
-        Bucle de escucha continua de voz: detecta 'Arey' o comandos directos, ejecuta y responde.
+        Bucle de escucha continua: SOLO se activa cuando el usuario dice estrictamente 'Arey'.
         """
         loop = asyncio.get_running_loop()
         while self.running:
-            result = await loop.run_in_executor(executor, wake_detector.listen_for_wake_word_or_command)
-            if result.get("activated"):
-                direct_cmd = result.get("direct_command")
-                
-                # Si ya dijo la orden completa (ej: 'busca mi teléfono' o 'Arey abre Spotify')
-                if direct_cmd:
-                    user_text = direct_cmd
-                else:
-                    # Solo dijo 'Arey', confirmar con "¿Sí?" y escuchar la orden
-                    await voice_engine.speak("¿Sí?")
-                    user_text = await loop.run_in_executor(executor, voice_engine.listen_speech)
+            # 1. Esperar estrictamente la palabra 'Arey'
+            detected = await loop.run_in_executor(executor, wake_detector.listen_for_wake_word)
+            if detected:
+                # Sonido de confirmación natural
+                await voice_engine.speak("¿Sí?")
 
+                # 2. Escuchar y transcribir con la IA de Gemini 3.6 Flash
+                user_text = await loop.run_in_executor(executor, voice_engine.listen_speech)
                 if user_text:
                     logger.info(f"Enviando consulta al cerebro de Arey: '{user_text}'")
                     if self.ws:
