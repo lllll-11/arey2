@@ -10,11 +10,25 @@ from audio_manager import get_microphone, create_recognizer, mic_lock
 
 logger = logging.getLogger("AreyPC")
 
-WAKE_WORDS = [
-    "arey", "ari", "aree", "haré", "aré", "are", "aire",
-    "hari", "harry", "oye arey", "hey arey", "hola arey",
-    "oye", "hey", "dime", "asistente"
-]
+import json
+
+PROFILE_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "user_voice_profile.json"))
+
+def get_wake_words():
+    base = [
+        "arey", "ari", "aree", "haré", "aré", "are", "aire",
+        "hari", "harry", "oye arey", "hey arey", "hola arey",
+        "oye", "hey", "dime", "asistente"
+    ]
+    if os.path.exists(PROFILE_PATH):
+        try:
+            with open(PROFILE_PATH, "r", encoding="utf-8") as f:
+                p = json.load(f)
+                custom = p.get("custom_wake_words", [])
+                return list(set(base + custom))
+        except Exception:
+            pass
+    return base
 
 class WakeWordDetector:
     def __init__(self):
@@ -84,7 +98,7 @@ class WakeWordDetector:
                             text = self._quick_transcribe(audio)
                             if text:
                                 logger.info(f"Wake escucho: '{text}'")
-                            if text and any(w in text for w in WAKE_WORDS):
+                            if text and any(w in text for w in get_wake_words()):
                                 logger.info(f"ACTIVADO! -> '{text}'")
                                 return True
                         except sr.WaitTimeoutError:

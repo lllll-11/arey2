@@ -1,4 +1,5 @@
 import os
+import json
 import time
 import asyncio
 import tempfile
@@ -12,17 +13,28 @@ from config import VOICE_NAME
 from audio_manager import get_microphone, create_recognizer, mic_lock
 
 logger = logging.getLogger("VoiceEngine")
+PROFILE_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "user_voice_profile.json"))
+
+def get_voice_profile():
+    if os.path.exists(PROFILE_PATH):
+        try:
+            with open(PROFILE_PATH, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return {
+        "vocabulary_keywords": ["Arey", "Larissa", "Spotify", "Netflix", "YouTube", "teléfono", "celular", "alarma", "linterna", "volumen", "música", "tele"],
+        "phonetic_corrections": {"laris": "Larissa", "larisa": "Larissa", "ari": "Arey", "haré": "Arey", "spoty": "Spotify", "cel": "teléfono"}
+    }
 
 class VoiceEngine:
     def __init__(self):
         pygame.mixer.init()
         self.recognizer = create_recognizer()
-        # Cortar audio rápido: en cuanto el usuario deja de hablar
         self.recognizer.pause_threshold = 0.5
         self.recognizer.non_speaking_duration = 0.3
 
         logger.info("Cargando Whisper tiny para transcripcion rapida...")
-        # tiny = ~150ms en CPU, suficiente precisión para español
         self.whisper_model = WhisperModel("tiny", device="cpu", compute_type="int8")
         logger.info("Whisper tiny listo!")
 
@@ -57,8 +69,23 @@ class VoiceEngine:
         except Exception as e:
             logger.error(f"Error en voz: {e}")
 
+    def _apply_corrections(self, text: str, profile: dict) -> str:
+        corrections = profile.get("phonetic_corrections", {})
+        words = text.split()
+        modified = False
+        for i, w in enumerate(words):
+            w_lower = w.lower().strip(".,;:?!")
+            if w_lower in corrections:
+                words[i] = corrections[w_lower]
+                modified = True
+        return " ".join(words) if modified else text
+
     def _transcribe(self, wav_bytes: bytes) -> str:
-        """Transcripción local con Whisper tiny — sin internet, ~150ms."""
+        """Transcripción local con Whisper tiny personalizada con el vocabulario del usuario."""
+        profile = get_voice_profile()
+        keywords = profile.get("vocabulary_keywords", [])
+        prompt = f"Asistente personal Arey en español. Vocabulario clave: {', '.join(keywords)}"
+
         tmp_path = None
         try:
             with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as f:
@@ -69,9 +96,12 @@ class VoiceEngine:
                 language="es",
                 beam_size=1,
                 vad_filter=True,
-                initial_prompt="Asistente personal. Comandos en español."
+                initial_prompt=prompt
             )
-            return " ".join(s.text.strip() for s in segs).strip()
+            raw_text = " ".join(s.text.strip() for s in segs).strip()
+            # Aplicar corrección fonética personalizada
+            final_text = self._apply_corrections(raw_text, profile)
+            return final_text
         except Exception as e:
             logger.warning(f"Whisper error: {e}")
             return ""
@@ -81,7 +111,6 @@ class VoiceEngine:
                 except: pass
 
     def listen_speech(self, timeout: float = 5.0, phrase_time_limit: float = 8.0) -> str:
-        """Escucha el comando y transcribe en ~150ms con Whisper tiny local."""
         time.sleep(0.05)
         try:
             with mic_lock:
