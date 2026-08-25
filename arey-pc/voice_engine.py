@@ -1,4 +1,5 @@
 import os
+import time
 import asyncio
 import tempfile
 import logging
@@ -46,23 +47,26 @@ class VoiceEngine:
         except Exception as e:
             logger.error(f"Error en reproducción de voz: {e}")
 
-    def listen_speech(self, timeout: float = 6.0, phrase_time_limit: float = 12.0) -> str:
+    def listen_speech(self, timeout: float = 8.0, phrase_time_limit: float = 15.0) -> str:
         """
-        Escucha a través del micrófono y convierte voz a texto usando reconocimiento en español.
+        Escucha a través del micrófono y convierte la orden del usuario a texto.
         """
-        with sr.Microphone() as source:
-            try:
-                logger.info("Escuchando comando del usuario...")
+        time.sleep(0.15) # Dar tiempo a que el hardware libere el flujo anterior
+        try:
+            with sr.Microphone() as source:
+                logger.info("👂 Escuchando tu orden...")
                 audio = self.recognizer.listen(source, timeout=timeout, phrase_time_limit=phrase_time_limit)
                 text = self.recognizer.recognize_google(audio, language="es-MX")
-                logger.info(f"Usuario dijo: '{text}'")
+                logger.info(f"🗣️ Dijiste: '{text}'")
                 return text
-            except sr.WaitTimeoutError:
-                return ""
-            except sr.UnknownValueError:
-                return ""
-            except Exception as e:
-                logger.warning(f"Error al reconocer voz: {e}")
-                return ""
+        except sr.WaitTimeoutError:
+            logger.info("Tiempo de espera agotado sin audio.")
+            return ""
+        except sr.UnknownValueError:
+            logger.info("No se entendió el audio claramente.")
+            return ""
+        except Exception as e:
+            logger.warning(f"Error al capturar voz: {e}")
+            return ""
 
 voice_engine = VoiceEngine()

@@ -1,22 +1,21 @@
 import logging
+import time
 import speech_recognition as sr
 from config import WAKE_WORDS
 
-logger = logging.getLogger("WakeWord")
+logger = logging.getLogger("AreyPC")
 
-# Palabras fonéticas para detectar la activación de Arey fácilmente
 EXTENDED_WAKE_WORDS = [
     "arey", "ari", "aree", "haré", "aré", "aire", "harry", "are", 
-    "oye arey", "hey arey", "hola arey", "oye", "hey", "hola"
+    "oye arey", "hey arey", "hola arey", "oye", "hey", "hola", "alexa"
 ]
 
 class WakeWordDetector:
     def __init__(self):
         self.recognizer = sr.Recognizer()
-        self.recognizer.energy_threshold = 150
+        self.recognizer.energy_threshold = 180
         self.recognizer.dynamic_energy_threshold = True
-        self.recognizer.dynamic_energy_adjustment_damping = 0.15
-        self.recognizer.pause_threshold = 0.4
+        self.recognizer.pause_threshold = 0.5
         self.is_running = True
 
     def listen_for_wake_word(self) -> bool:
@@ -25,28 +24,38 @@ class WakeWordDetector:
         """
         try:
             with sr.Microphone() as source:
-                self.recognizer.adjust_for_ambient_noise(source, duration=0.4)
-                logger.info("🎤 [MIC LISTO] Di 'Arey' o 'Oye Arey' en voz alta...")
+                logger.info("🎤 Calibrando micrófono...")
+                self.recognizer.adjust_for_ambient_noise(source, duration=0.6)
+                logger.info("🎤 [MICRÓFONO LISTO] Puedes hablar: di 'Arey' u 'Oye Arey'...")
 
                 while self.is_running:
                     try:
-                        audio = self.recognizer.listen(source, timeout=3.0, phrase_time_limit=3.0)
+                        # Escuchar fragmento de audio
+                        audio = self.recognizer.listen(source, timeout=None, phrase_time_limit=4.0)
                         try:
                             text = self.recognizer.recognize_google(audio, language="es-MX").lower().strip()
-                            logger.debug(f"Audio captado: '{text}'")
+                            logger.info(f"🔊 Escuché: '{text}'")
                             
-                            # Comprobar si coincide con 'Arey' o variantes
+                            # Comprobar si contiene 'Arey' o palabras clave
                             if any(w in text for w in EXTENDED_WAKE_WORDS):
                                 logger.info(f"✨ ¡Activación detectada! -> '{text}'")
                                 return True
-                        except (sr.UnknownValueError, sr.WaitTimeoutError):
+                        except sr.UnknownValueError:
+                            # Sonido no reconocido como palabra, continuar escuchando
+                            continue
+                        except sr.RequestError as e:
+                            logger.warning(f"Error de conexión en reconocimiento: {e}")
+                            time.sleep(1)
                             continue
                     except sr.WaitTimeoutError:
                         continue
-                    except Exception:
+                    except Exception as e:
+                        logger.debug(f"Ciclo audio: {e}")
+                        time.sleep(0.5)
                         continue
         except Exception as e:
             logger.error(f"Error accediendo al micrófono: {e}")
+            time.sleep(2) # Evitar bucle rápido si el dispositivo está ocupado
 
         return False
 
