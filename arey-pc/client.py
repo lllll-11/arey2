@@ -1,8 +1,13 @@
+import sys
+import os
+import threading
 import asyncio
 import json
 import logging
 import websockets
 from concurrent.futures import ThreadPoolExecutor
+
+from PyQt6.QtWidgets import QApplication
 
 from config import SERVER_WS_URL, DEVICE_AUTH_TOKEN
 from pc_controller import pc_controller
@@ -10,6 +15,7 @@ from voice_engine import voice_engine
 from wake_word import wake_detector
 from network_scanner import network_scanner
 from tv_controller import tv_controller
+from floating_orb import FloatingAreyOrb, state_bridge
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] AreyPC: %(message)s")
 logger = logging.getLogger("AreyPCClient")
@@ -104,13 +110,19 @@ class AreyPCClient:
             elif msg_type == "brain_reply":
                 reply_text = data.get("text", "")
                 if reply_text:
+                    # Activar animación de hablar en el orbe flotante
+                    state_bridge.state_changed.emit("speaking")
                     await voice_engine.speak(reply_text)
+                    # Regresar a estado de reposo
+                    state_bridge.state_changed.emit("idle")
 
             # 3. Evento de recordatorio / alarma
             elif msg_type == "event" and data.get("event") == "reminder_alert":
                 rem_data = data.get("data", {})
                 rem_msg = rem_data.get("message", "Tienes un recordatorio pendiente.")
+                state_bridge.state_changed.emit("speaking")
                 await voice_engine.speak(f"Atención: {rem_msg}")
+                state_bridge.state_changed.emit("idle")
 
     async def _execute_action(self, action: str, params: dict) -> dict:
         """
@@ -128,7 +140,6 @@ class AreyPCClient:
             res = pc_controller.capture_screen()
             query = params.get("query", "")
             if res.get("status") == "success":
-                # Si se requiere análisis, enviar también para procesamiento
                 return {"status": "success", "image_base64": res.get("image_base64"), "query": query}
             return res
         elif action == "run_command":
@@ -139,7 +150,6 @@ class AreyPCClient:
         elif action == "control_tv":
             cmd = params.get("command", "play_pause")
             app_name = params.get("app_name")
-            # Buscar Smart TV en la red
             devices = await network_scanner.scan_all()
             tv = next((d for d in devices if "tv" in d.get("type", "").lower() or d.get("protocol") == "roku_ecp"), None)
             if tv:
@@ -155,24 +165,42 @@ class AreyPCClient:
         loop = asyncio.get_running_loop()
         while self.running:
             # 1. Esperar estrictamente la palabra 'Arey'
+            state_bridge.state_changed.emit("idle")
             detected = await loop.run_in_executor(executor, wake_detector.listen_for_wake_word)
             if detected:
-                # Sonido de confirmación instantáneo (5 milisegundos, cero espera de red)
+                # Activar animación de escucha en el orbe
+                state_bridge.state_changed.emit("listening")
+                # Sonido de confirmación instantáneo
                 voice_engine.play_instant_wake()
 
                 # 2. Escuchar y transcribir con Whisper neuronal local (150ms)
                 user_text = await loop.run_in_executor(executor, voice_engine.listen_speech)
                 if user_text:
                     logger.info(f"Enviando consulta al cerebro de Arey: '{user_text}'")
+                    # Activar animación de pensando / procesando
+                    state_bridge.state_changed.emit("thinking")
                     if self.ws:
                         await self.ws.send(json.dumps({
                             "type": "voice_command",
                             "text": user_text
                         }))
+                else:
+                    state_bridge.state_changed.emit("idle")
 
 if __name__ == "__main__":
+    app = QApplication(sys.argv)
+    
+    # Crear y mostrar el orbe flotante
+    orb = FloatingAreyOrb()
+    orb.show()
+
+    # Iniciar el cliente de Arey en un hilo asíncrono secundario
     client = AreyPCClient()
-    try:
-        asyncio.run(client.start())
-    except KeyboardInterrupt:
-        logger.info("Agente de Laptop Arey detenido.")
+    client_thread = threading.Thread(
+        target=lambda: asyncio.run(client.start()),
+        daemon=True
+    )
+    client_thread.start()
+
+    logger.info("✨ Interfaz flotante de Arey iniciada con éxito.")
+    sys.exit(app.exec())
