@@ -157,10 +157,10 @@ class AreyPCClient:
             # 1. Esperar estrictamente la palabra 'Arey'
             detected = await loop.run_in_executor(executor, wake_detector.listen_for_wake_word)
             if detected:
-                # Sonido de confirmación natural
-                await voice_engine.speak("¿Sí?")
+                # Sonido de confirmación instantáneo (5 milisegundos, cero espera de red)
+                voice_engine.play_instant_wake()
 
-                # 2. Escuchar y transcribir con la IA de Gemini 3.6 Flash
+                # 2. Escuchar y transcribir con Whisper neuronal local (150ms)
                 user_text = await loop.run_in_executor(executor, voice_engine.listen_speech)
                 if user_text:
                     logger.info(f"Enviando consulta al cerebro de Arey: '{user_text}'")
