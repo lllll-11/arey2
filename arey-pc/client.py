@@ -11,30 +11,38 @@ from PyQt6.QtWidgets import QApplication
 
 from config import SERVER_WS_URL, DEVICE_AUTH_TOKEN
 from pc_controller import pc_controller
-from voice_engine import voice_engine
-from wake_word import wake_detector
+from audio_pipeline import audio_pipeline
 from network_scanner import network_scanner
 from tv_controller import tv_controller
-from floating_orb import FloatingAreyOrb, state_bridge
+from floating_ui import FloatingAreyCapsule, ui_bridge
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] AreyPC: %(message)s")
 logger = logging.getLogger("AreyPCClient")
 
-executor = ThreadPoolExecutor(max_workers=3)
+executor = ThreadPoolExecutor(max_workers=4)
 
 class AreyPCClient:
+    """
+    Cliente Central de Laptop Arey 2.0:
+    Coordina la interfaz Glassmorphism, el pipeline de audio, el control de Windows y la sincronización en la nube.
+    """
     def __init__(self):
         self.ws = None
         self.running = True
+        self.is_processing_voice = False
+        self.force_wake_event = threading.Event()
 
     async def start(self):
-        logger.info(f"Iniciando Agente de Laptop Arey. Conectando a {SERVER_WS_URL}...")
-        # Iniciar el bucle de escucha de voz permanente (una sola vez)
+        logger.info(f"🚀 Iniciando Agente de Laptop Arey 2.0. Conectando a {SERVER_WS_URL}...")
+        
+        # Conectar disparador manual (Alt+Espacio o Clic)
+        ui_bridge.trigger_voice_requested.connect(self.trigger_manual_voice)
+
+        # Iniciar bucle de escucha de voz permanente (una sola vez)
         asyncio.create_task(self._voice_loop())
 
         while self.running:
             try:
-                # Conectar al WebSocket del Servidor Arey
                 async with websockets.connect(
                     f"{SERVER_WS_URL}?token={DEVICE_AUTH_TOKEN}",
                     ping_interval=20,
@@ -42,11 +50,12 @@ class AreyPCClient:
                 ) as ws:
                     self.ws = ws
                     logger.info("✅ Conexión establecida exitosamente con el cerebro de Arey.")
+                    ui_bridge.subtitle_changed.emit("status", "Conectado. Di 'Arey' o presiona Alt + Espacio")
 
                     # Enviar estado inicial del sistema
                     await self._send_status()
 
-                    # Ejecutar tareas concurrentes de red: receptor y telemetría
+                    # Escuchar mensajes remotos y telemetría
                     listener_task = asyncio.create_task(self._listen_server_messages())
                     telemetry_task = asyncio.create_task(self._telemetry_loop())
 
@@ -58,11 +67,17 @@ class AreyPCClient:
                         task.cancel()
 
             except (websockets.exceptions.ConnectionClosed, OSError) as e:
-                logger.warning(f"Desconectado del servidor Arey ({e}). Reintentando en 5 segundos...")
-                await asyncio.sleep(5)
+                logger.warning(f"Desconectado del servidor ({e}). Reintentando en 4s...")
+                ui_bridge.subtitle_changed.emit("status", "Reconectando con la nube de Arey...")
+                await asyncio.sleep(4)
             except Exception as e:
                 logger.error(f"Error inesperado en cliente PC: {e}", exc_info=True)
-                await asyncio.sleep(5)
+                await asyncio.sleep(4)
+
+    def trigger_manual_voice(self):
+        """Activa la escucha de inmediato desde el atajo Alt+Espacio o el botón de la UI."""
+        logger.info("⚡ Activación manual por Atajo Alt+Espacio / Botón UI")
+        self.force_wake_event.set()
 
     async def _send_status(self):
         if self.ws:
@@ -74,15 +89,19 @@ class AreyPCClient:
 
     async def _telemetry_loop(self):
         while self.running:
-            await asyncio.sleep(60)
+            await asyncio.sleep(45)
             await self._send_status()
 
     async def _listen_server_messages(self):
         """
-        Escucha comandos remotos despachados por el Servidor Arey (desde el teléfono o Alexa).
+        Escucha comandos remotos y respuestas del cerebro en la nube.
         """
         while self.running:
-            message_raw = await self.ws.recv()
+            try:
+                message_raw = await self.ws.recv()
+            except Exception:
+                break
+
             try:
                 data = json.loads(message_raw)
             except Exception:
@@ -99,34 +118,44 @@ class AreyPCClient:
 
                 res = await self._execute_action(action, params)
 
-                # Devolver respuesta al servidor
-                await self.ws.send(json.dumps({
-                    "type": "command_response",
-                    "request_id": request_id,
-                    "response": res
-                }))
+                if self.ws:
+                    await self.ws.send(json.dumps({
+                        "type": "command_response",
+                        "request_id": request_id,
+                        "response": res
+                    }))
 
-            # 2. Respuesta de voz generada por el Cerebro
+            # 2. Respuesta de voz generada por el Cerebro de Arey
             elif msg_type == "brain_reply":
                 reply_text = data.get("text", "")
                 if reply_text:
-                    # Activar animación de hablar en el orbe flotante
-                    state_bridge.state_changed.emit("speaking")
-                    await voice_engine.speak(reply_text)
-                    # Regresar a estado de reposo
-                    state_bridge.state_changed.emit("idle")
+                    ui_bridge.state_changed.emit("speaking")
+                    ui_bridge.subtitle_changed.emit("arey", reply_text)
+                    await audio_pipeline.speak(reply_text)
+                    ui_bridge.state_changed.emit("idle")
+                    self.is_processing_voice = False
 
-            # 3. Evento de recordatorio / alarma
+            # 3. Telemetría de dispositivos (Celular, Smart TV)
+            elif msg_type == "devices_update":
+                devices = data.get("devices", {})
+                android = devices.get("android", {})
+                ui_bridge.device_status_changed.emit({
+                    "phone_battery": android.get("status", {}).get("battery"),
+                    "phone_online": android.get("online", False),
+                    "tv_online": True
+                })
+
+            # 4. Recordatorios / Alarmas
             elif msg_type == "event" and data.get("event") == "reminder_alert":
-                rem_data = data.get("data", {})
-                rem_msg = rem_data.get("message", "Tienes un recordatorio pendiente.")
-                state_bridge.state_changed.emit("speaking")
-                await voice_engine.speak(f"Atención: {rem_msg}")
-                state_bridge.state_changed.emit("idle")
+                rem_msg = data.get("data", {}).get("message", "Tienes un recordatorio pendiente.")
+                ui_bridge.state_changed.emit("speaking")
+                ui_bridge.subtitle_changed.emit("arey", f"Recordatorio: {rem_msg}")
+                await audio_pipeline.speak(f"Atención: {rem_msg}")
+                ui_bridge.state_changed.emit("idle")
 
     async def _execute_action(self, action: str, params: dict) -> dict:
         """
-        Ejecuta la acción solicitada en el sistema Windows.
+        Ejecuta acciones en el sistema Windows y Smart TV.
         """
         if action == "set_volume":
             return pc_controller.set_volume(params.get("level_percent", 50))
@@ -134,6 +163,12 @@ class AreyPCClient:
             return pc_controller.open_app(params.get("app_name", ""))
         elif action == "control_media":
             return pc_controller.control_media(params.get("action", "play_pause"))
+        elif action == "play_music":
+            return pc_controller.play_music(params.get("query", ""), params.get("platform", "spotify"))
+        elif action == "open_website":
+            return pc_controller.open_website(params.get("url_or_query", ""))
+        elif action == "press_hotkey":
+            return pc_controller.press_hotkey(params.get("keys_str", ""))
         elif action == "lock_workstation":
             return pc_controller.lock_workstation()
         elif action == "capture_screen":
@@ -144,12 +179,6 @@ class AreyPCClient:
             return res
         elif action == "run_command":
             return pc_controller.run_command(params.get("command", ""))
-        elif action == "play_music":
-            return pc_controller.play_music(params.get("query", ""), params.get("platform", "spotify"))
-        elif action == "open_website":
-            return pc_controller.open_website(params.get("url_or_query", ""))
-        elif action == "press_hotkey":
-            return pc_controller.press_hotkey(params.get("keys_str", ""))
         elif action == "scan_network":
             devices = await network_scanner.scan_all()
             return {"status": "success", "devices": devices}
@@ -166,57 +195,56 @@ class AreyPCClient:
 
     async def _voice_loop(self):
         """
-        Bucle de escucha continua: SOLO se activa cuando el usuario dice 'Arey'.
+        Bucle de escucha continua: reacciona a 'Arey', Alt+Espacio o Clic.
         """
         loop = asyncio.get_running_loop()
         while self.running:
-            state_bridge.state_changed.emit("idle")
-            # 1. Esperar la palabra 'Arey'
-            detected = await loop.run_in_executor(executor, wake_detector.listen_for_wake_word)
-            if not detected:
-                continue
+            if not self.is_processing_voice:
+                ui_bridge.state_changed.emit("idle")
 
-            # 2. Confirmar y escuchar la orden
-            state_bridge.state_changed.emit("listening")
-            voice_engine.play_instant_wake()
+            # 1. Comprobar si se activó por atajo o esperar por voz
+            is_manual = self.force_wake_event.is_set()
+            if is_manual:
+                self.force_wake_event.clear()
+                detected = True
+            else:
+                detected = await loop.run_in_executor(executor, audio_pipeline.listen_for_wake_word)
 
-            user_text = await loop.run_in_executor(executor, voice_engine.listen_speech)
-            logger.info(f"==> Texto transcrito: '{user_text}'")
+            if detected:
+                self.is_processing_voice = True
+                ui_bridge.state_changed.emit("listening")
+                ui_bridge.subtitle_changed.emit("status", "Escuchando... Habla ahora")
+                audio_pipeline.play_instant_wake()
 
-            if not user_text or not user_text.strip():
-                logger.warning("No se transcribió texto. Volviendo a escuchar...")
-                state_bridge.state_changed.emit("idle")
-                continue
+                # 2. Escuchar la orden del usuario con Whisper neuronal local (150ms)
+                user_text = await loop.run_in_executor(executor, audio_pipeline.listen_command)
 
-            # 3. Enviar al cerebro
-            state_bridge.state_changed.emit("thinking")
+                if user_text and user_text.strip():
+                    logger.info(f"🗣️ Orden recibida: '{user_text}'")
+                    ui_bridge.subtitle_changed.emit("user", user_text)
+                    ui_bridge.state_changed.emit("thinking")
 
-            if not self.ws:
-                logger.warning("Sin conexión al servidor. Reintentando en 2s...")
-                await asyncio.sleep(2)
-                state_bridge.state_changed.emit("idle")
-                continue
-
-            try:
-                logger.info(f"==> Enviando al cerebro: '{user_text}'")
-                await self.ws.send(json.dumps({
-                    "type": "voice_command",
-                    "text": user_text
-                }))
-                logger.info("==> Mensaje enviado. Esperando respuesta...")
-            except Exception as e:
-                logger.error(f"Error enviando mensaje: {e}")
-                state_bridge.state_changed.emit("idle")
-
+                    if self.ws:
+                        await self.ws.send(json.dumps({
+                            "type": "voice_command",
+                            "text": user_text
+                        }))
+                    else:
+                        ui_bridge.subtitle_changed.emit("status", "Servidor no conectado temporalmente")
+                        self.is_processing_voice = False
+                else:
+                    ui_bridge.subtitle_changed.emit("status", "No escuché ninguna orden. Di 'Arey' para intentar de nuevo")
+                    ui_bridge.state_changed.emit("idle")
+                    self.is_processing_voice = False
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     
-    # Crear y mostrar el orbe flotante
-    orb = FloatingAreyOrb()
-    orb.show()
+    # Crear y mostrar la cápsula Glassmorphic flotante
+    capsule = FloatingAreyCapsule()
+    capsule.show()
 
-    # Iniciar el cliente de Arey en un hilo asíncrono secundario
+    # Iniciar cliente de red y audio en un hilo asíncrono
     client = AreyPCClient()
     client_thread = threading.Thread(
         target=lambda: asyncio.run(client.start()),
@@ -224,5 +252,5 @@ if __name__ == "__main__":
     )
     client_thread.start()
 
-    logger.info("✨ Interfaz flotante de Arey iniciada con éxito.")
+    logger.info("✨ Arey 2.0 iniciado con éxito con interfaz Glassmorphism.")
     sys.exit(app.exec())
