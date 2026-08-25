@@ -99,7 +99,13 @@ class AreyPCClient:
                     "response": res
                 }))
 
-            # 2. Evento de recordatorio / alarma
+            # 2. Respuesta de voz generada por el Cerebro
+            elif msg_type == "brain_reply":
+                reply_text = data.get("text", "")
+                if reply_text:
+                    await voice_engine.speak(reply_text)
+
+            # 3. Evento de recordatorio / alarma
             elif msg_type == "event" and data.get("event") == "reminder_alert":
                 rem_data = data.get("data", {})
                 rem_msg = rem_data.get("message", "Tienes un recordatorio pendiente.")
@@ -147,7 +153,7 @@ class AreyPCClient:
         """
         loop = asyncio.get_running_loop()
         while self.running:
-            # 1. Esperar detección de 'Arey' en hilo secundario para no bloquear eventos
+            # 1. Esperar detección de 'Arey' en hilo secundario
             detected = await loop.run_in_executor(executor, wake_detector.listen_for_wake_word)
             if detected:
                 # Sonido de confirmación rápido
@@ -162,13 +168,6 @@ class AreyPCClient:
                             "type": "voice_command",
                             "text": user_text
                         }))
-
-                        # Esperar la respuesta del cerebro y pronunciarla
-                        reply_raw = await self.ws.recv()
-                        reply_data = json.loads(reply_raw)
-                        if reply_data.get("type") == "brain_reply":
-                            reply_text = reply_data.get("text", "")
-                            await voice_engine.speak(reply_text)
 
 if __name__ == "__main__":
     client = AreyPCClient()
