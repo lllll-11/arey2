@@ -48,6 +48,23 @@ def optimize_windows_environment():
     except Exception as e:
         logger.debug(f"Optimizador de tiempo Windows: {e}")
 
+def ensure_single_instance():
+    """Garantiza que solo una instancia de Arey esté activa para no saturar el micrófono."""
+    try:
+        import psutil
+        current_pid = os.getpid()
+        for p in psutil.process_iter(['pid', 'cmdline']):
+            if p.info['pid'] != current_pid:
+                cmd = ' '.join(p.info['cmdline'] or [])
+                if 'client.py' in cmd:
+                    try:
+                        p.terminate()
+                        logger.info(f"🧹 Instancia anterior [PID {p.info['pid']}] cerrada automáticamente.")
+                    except Exception:
+                        pass
+    except Exception:
+        pass
+
 class AreyPCClient:
     """
     Cliente Autónomo Local de Laptop Arey 2.1:
@@ -56,6 +73,7 @@ class AreyPCClient:
     - Fast-Path < 10ms y respuestas de IA en sub-segundo (~350ms).
     """
     def __init__(self):
+        ensure_single_instance()
         optimize_windows_environment()
         self.ws = None
         self.running = True
