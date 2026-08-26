@@ -1,6 +1,6 @@
 {
   "calibrated_energy_threshold": 70,
-  "user_name": "Usuario",
+  "user_name": "Andriy",
   "custom_wake_words": [
     "arey",
     "ari",
@@ -17,6 +17,7 @@
   ],
   "vocabulary_keywords": [
     "Arey",
+    "Andriy",
     "Larissa",
     "Spotify",
     "Netflix",
