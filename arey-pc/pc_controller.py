@@ -216,4 +216,8 @@ class PCController:
         except Exception:
             return {}
 
+    @staticmethod
+    def get_system_stats() -> Dict[str, Any]:
+        return PCController.get_system_status()
+
 pc_controller = PCController()
