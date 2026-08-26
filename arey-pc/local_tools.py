@@ -152,3 +152,29 @@ def tool_find_my_phone() -> Dict[str, Any]:
         except Exception:
             pass
     return {"status": "error", "message": "El celular no está conectado al servidor en este momento."}
+
+def tool_make_phone_call(contact_name: str) -> Dict[str, Any]:
+    """Inicia una llamada telefónica desde el celular Android a un contacto."""
+    try:
+        ui_bridge.emit_state("trabajando")
+    except Exception:
+        pass
+    if _ws_client_ref and _ws_client_ref.ws:
+        try:
+            return asyncio.run(_ws_client_ref.send_remote_command("android", "make_call", {"contact_name": contact_name}))
+        except Exception:
+            pass
+    return {"status": "error", "message": "El celular no está disponible para llamadas."}
+
+def tool_send_whatsapp(contact_name: str, message: str) -> Dict[str, Any]:
+    """Envía un mensaje de WhatsApp desde el celular Android."""
+    try:
+        ui_bridge.emit_state("trabajando")
+    except Exception:
+        pass
+    if _ws_client_ref and _ws_client_ref.ws:
+        try:
+            return asyncio.run(_ws_client_ref.send_remote_command("android", "send_whatsapp", {"contact_name": contact_name, "message": message}))
+        except Exception:
+            pass
+    return {"status": "error", "message": "El celular no está disponible para enviar WhatsApp."}
