@@ -8,12 +8,13 @@ from google.genai import types
 
 from config import GEMINI_API_KEY, GEMINI_MODEL
 from local_memory import local_memory
+from pc_controller import pc_controller
 from local_tools import (
     tool_set_pc_volume, tool_control_pc_media, tool_play_music,
     tool_open_website, tool_open_pc_app, tool_press_hotkey, tool_lock_pc,
-    tool_take_pc_screenshot_and_analyze, tool_run_pc_command,
-    tool_scan_network_devices, tool_control_smart_tv, tool_search_web_live,
-    tool_save_personal_fact, tool_find_my_phone, tool_make_phone_call, tool_send_whatsapp
+    tool_run_pc_command, tool_scan_network_devices, tool_control_smart_tv,
+    tool_search_web_live, tool_save_personal_fact, tool_find_my_phone,
+    tool_make_phone_call, tool_send_whatsapp
 )
 
 logger = logging.getLogger("AreyLocalBrain")
@@ -21,8 +22,9 @@ logger = logging.getLogger("AreyLocalBrain")
 class LocalAreyBrain:
     """
     Cerebro Local de Alta Velocidad para Laptop:
-    Ejecuta el razonamiento de Gemini Flash directamente desde la PC sin pasar por Render,
-    reduciendo la latencia a sub-segundo (~350ms) y eliminando caídas de red.
+    - Gemini Multimodal nativo para análisis instantáneo de pantalla (< 300 tokens).
+    - Inferencia directa sin pasar por Render.
+    - Modelos estables de alta cuota (gemini-2.5-flash / gemini-2.0-flash).
     """
     def __init__(self):
         self.client = None
@@ -71,7 +73,6 @@ Tu tono es directo, con un sarcasmo seco y ocasional — nunca payaso, nunca sum
 - Si pregunta por noticias, clima o datos en tiempo real ➔ USA DIRECTAMENTE `tool_search_web_live(query=...)`.
 - Si pide buscar su cel, llamar o mandar WhatsApp ➔ USA `tool_find_my_phone`, `tool_make_phone_call` o `tool_send_whatsapp`.
 - Si pide controlar la Smart TV (Netflix, YouTube, volumen, power) ➔ USA `tool_control_smart_tv`.
-- Si pide analizar su pantalla ➔ USA `tool_take_pc_screenshot_and_analyze`.
 
 === ENTORNO DE TRABAJO ===
 - Usuario: Andriy
@@ -97,8 +98,8 @@ Tu tono es directo, con un sarcasmo seco y ocasional — nunca payaso, nunca sum
             return [tool_make_phone_call, tool_send_whatsapp, tool_find_my_phone, tool_save_personal_fact]
 
         # Dominio 4: PC / Sistema & Búsqueda Web
-        if any(w in t for w in ["busca", "google", "web", "pagina", "página", "internet", "clima", "noticia", "pantalla", "lee", "captura", "screenshot", "recuerda", "agenda", "alarma"]):
-            return [tool_open_website, tool_search_web_live, tool_take_pc_screenshot_and_analyze, tool_open_pc_app, tool_save_personal_fact]
+        if any(w in t for w in ["busca", "google", "web", "pagina", "página", "internet", "clima", "noticia", "recuerda", "agenda", "alarma", "calculadora"]):
+            return [tool_open_website, tool_search_web_live, tool_open_pc_app, tool_save_personal_fact]
 
         # Dominio 5: Conversación general / Mixto
         return [
@@ -125,12 +126,28 @@ Tu tono es directo, con un sarcasmo seco y ocasional — nunca payaso, nunca sum
         await local_memory.add_message(role="user", content=user_text, device_source="pc")
 
         system_instruction = await self._build_system_instruction()
-        relevant_tools = self._filter_tools_by_intent(user_text)
+
+        # Detección de intención visual de pantalla
+        is_screen_query = any(w in user_text.lower() for w in ["pantalla", "screenshot", "captura", "que ves", "qué ves", "que tengo", "qué tengo", "lee esto"])
+        
+        screen_bytes = None
+        if is_screen_query:
+            try:
+                from floating_ui import ui_bridge
+                ui_bridge.emit_state("analizando")
+                shot_data = pc_controller.capture_screen()
+                if shot_data.get("status") == "success":
+                    screen_bytes = shot_data.get("image_bytes")
+            except Exception as e:
+                logger.debug(f"Error capturando pantalla: {e}")
+
+        relevant_tools = [] if is_screen_query else self._filter_tools_by_intent(user_text)
 
         candidate_models = [
-            "gemini-3.5-flash-lite",
-            "gemini-3.1-flash-lite",
-            "gemini-3.5-flash"
+            "gemini-2.5-flash",
+            "gemini-2.0-flash",
+            "gemini-1.5-flash",
+            "gemini-2.5-flash-lite"
         ]
 
         recent_history = await local_memory.get_recent_history(limit=4)
@@ -142,20 +159,40 @@ Tu tono es directo, con un sarcasmo seco y ocasional — nunca payaso, nunca sum
                 parts=[types.Part.from_text(text=msg["content"])]
             ))
 
+        # Preparar partes del mensaje actual
+        message_parts = []
+        if screen_bytes:
+            message_parts.append(types.Part.from_bytes(data=screen_bytes, mime_type="image/jpeg"))
+            message_parts.append(types.Part.from_text(text=f"Andriy te pide analizar su pantalla: '{user_text}'. Describe lo que ves de forma concisa y técnica."))
+        else:
+            message_parts.append(types.Part.from_text(text=user_text))
+
         last_error = None
         for model_name in candidate_models:
             try:
-                chat = self.client.aio.chats.create(
-                    model=model_name,
-                    config=types.GenerateContentConfig(
-                        system_instruction=system_instruction,
-                        tools=relevant_tools,
-                        temperature=0.7
-                    ),
-                    history=history_contents
-                )
+                if is_screen_query:
+                    # Inferencia multimodal directa (visión nativa de pantalla)
+                    response = await self.client.aio.models.generate_content(
+                        model=model_name,
+                        contents=message_parts,
+                        config=types.GenerateContentConfig(
+                            system_instruction=system_instruction,
+                            temperature=0.4
+                        )
+                    )
+                else:
+                    # Inferencia conversacional con herramientas
+                    chat = self.client.aio.chats.create(
+                        model=model_name,
+                        config=types.GenerateContentConfig(
+                            system_instruction=system_instruction,
+                            tools=relevant_tools,
+                            temperature=0.7
+                        ),
+                        history=history_contents
+                    )
+                    response = await chat.send_message(user_text)
 
-                response = await chat.send_message(user_text)
                 final_text = response.text.strip() if response and response.text else "Listo, orden ejecutada."
 
                 # Guardar respuesta de Arey en la memoria local

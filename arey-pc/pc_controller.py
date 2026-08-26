@@ -162,14 +162,16 @@ class PCController:
     @staticmethod
     def capture_screen() -> Dict[str, Any]:
         """
-        Toma una captura de la pantalla completa y la devuelve en Base64.
+        Toma una captura de la pantalla optimizada y comprimida para análisis con IA.
         """
         try:
             screenshot = ImageGrab.grab()
+            screenshot.thumbnail((1280, 720))
             buffer = io.BytesIO()
-            screenshot.save(buffer, format="JPEG", quality=85)
-            img_b64 = base64.b64encode(buffer.getvalue()).decode("utf-8")
-            return {"status": "success", "image_base64": img_b64}
+            screenshot.save(buffer, format="JPEG", quality=60)
+            img_bytes = buffer.getvalue()
+            img_b64 = base64.b64encode(img_bytes).decode("utf-8")
+            return {"status": "success", "image_bytes": img_bytes, "image_base64": img_b64}
         except Exception as e:
             logger.error(f"Error al capturar pantalla: {e}")
             return {"status": "error", "error": str(e)}
