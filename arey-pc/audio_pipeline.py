@@ -38,8 +38,8 @@ class AudioPipeline:
         self.recognizer = sr.Recognizer()
         self.recognizer.energy_threshold = 80
         self.recognizer.dynamic_energy_threshold = False
-        self.recognizer.pause_threshold = 0.35 # Corta a los 350ms de terminar de hablar
-        self.recognizer.non_speaking_duration = 0.15
+        self.recognizer.pause_threshold = 0.85 # +1 segundo de margen para pausas naturales
+        self.recognizer.non_speaking_duration = 0.35
 
         self.microphone = self._get_best_microphone()
         self.consecutive_empty_count = 0
@@ -187,7 +187,7 @@ class AudioPipeline:
             time.sleep(0.1)
         return False
 
-    def listen_command(self, timeout: float = 4.0, phrase_time_limit: float = 8.0) -> str:
+    def listen_command(self, timeout: float = 6.0, phrase_time_limit: float = 12.0) -> str:
         time.sleep(0.02)
         perf_tracker.start_stage("Captura Micrófono")
         try:
