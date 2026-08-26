@@ -22,8 +22,4 @@ if not exist venv (
 echo Conectando con el Cerebro Central de Arey...
 python client.py
 
-if errorlevel 1 (
-    echo.
-    echo Ocurrio un error inesperado al cerrar Arey.
-    pause
-)
+pause

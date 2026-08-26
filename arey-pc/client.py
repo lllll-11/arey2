@@ -232,15 +232,21 @@ class AreyPCClient:
                 perf_tracker.print_summary(clean)
 
 if __name__ == "__main__":
-    client = AreyPCClient()
-    client_thread = threading.Thread(
-        target=lambda: asyncio.run(client.start()),
-        daemon=True
-    )
-    client_thread.start()
+    try:
+        client = AreyPCClient()
+        client_thread = threading.Thread(
+            target=lambda: asyncio.run(client.start()),
+            daemon=True
+        )
+        client_thread.start()
 
-    logger.info("✨ Arey 2.1 iniciada en Modo de Escucha Continua con Filtro Anti-Música.")
-    start_floating_ui(
-        on_wake_callback=client.force_wake,
-        on_media_callback=lambda act: pc_controller.control_media(act)
-    )
+        logger.info("✨ Arey 2.1 iniciada en Modo de Escucha Continua con Filtro Anti-Música.")
+        start_floating_ui(
+            on_wake_callback=client.force_wake,
+            on_media_callback=lambda act: pc_controller.control_media(act)
+        )
+        sys.exit(0)
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        sys.exit(1)
