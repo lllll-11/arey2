@@ -36,12 +36,12 @@ class AudioPipeline:
             pygame.mixer.init()
 
         self.recognizer = sr.Recognizer()
-        self.recognizer.energy_threshold = 160
+        self.recognizer.energy_threshold = 200
         self.recognizer.dynamic_energy_threshold = True
         self.recognizer.dynamic_energy_adjustment_damping = 0.15
         self.recognizer.dynamic_energy_ratio = 1.5
-        self.recognizer.pause_threshold = 0.35 # Corta inmediatamente a los 350ms de silencio
-        self.recognizer.non_speaking_duration = 0.15
+        self.recognizer.pause_threshold = 1.2 # Permite pausas naturales sin cortar frases a medias
+        self.recognizer.non_speaking_duration = 0.5
 
         self.microphone = self._get_best_microphone()
         self.consecutive_empty_count = 0
@@ -157,10 +157,10 @@ class AudioPipeline:
         perf_tracker.end_stage("STT Transcripción")
         return ""
 
-    def listen_for_wake_word(self, timeout: float = 0.6, phrase_time_limit: float = 2.5) -> Tuple[bool, str]:
+    def listen_for_wake_word(self, timeout: float = 1.0, phrase_time_limit: float = 4.0) -> Tuple[bool, str]:
         profile = self.get_user_profile()
         wake_words = list(set(self.base_wake_words + profile.get("custom_wake_words", [])))
-        threshold = profile.get("calibrated_energy_threshold", 160)
+        threshold = profile.get("calibrated_energy_threshold", 200)
         self.recognizer.energy_threshold = threshold
 
         try:
@@ -191,7 +191,7 @@ class AudioPipeline:
 
         return False, ""
 
-    def listen_command(self, timeout: float = 3.5, phrase_time_limit: float = 4.5) -> str:
+    def listen_command(self, timeout: float = 6.0, phrase_time_limit: float = 15.0) -> str:
         time.sleep(0.02)
         perf_tracker.start_stage("Captura Micrófono")
         try:
