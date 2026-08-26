@@ -42,15 +42,16 @@ class DeviceBroker:
         action: str,
         params: Optional[Dict[str, Any]] = None,
         wait_for_response: bool = True,
-        timeout: float = 12.0
+        timeout: float = 4.0
     ) -> Dict[str, Any]:
         """
-        Envía un comando JSON al dispositivo indicado y espera la respuesta si es necesario.
+        Envía un comando JSON al dispositivo indicado y espera la confirmación (ACK).
         """
         if device_type not in self.active_connections:
             return {
+                "status": "error",
                 "success": False,
-                "error": f"El dispositivo '{device_type}' no está conectado actualmente a Arey."
+                "error": f"Tu dispositivo {device_type.upper()} no está conectado a Arey en este momento."
             }
 
         websocket = self.active_connections[device_type]
@@ -72,14 +73,15 @@ class DeviceBroker:
                 result = await asyncio.wait_for(future, timeout=timeout)
                 return result
             except asyncio.TimeoutError:
-                logger.warning(f"Timeout esperando respuesta de {device_type} para la acción {action}")
+                logger.warning(f"Timeout (4s) esperando ACK de {device_type} para '{action}'")
                 return {
+                    "status": "error",
                     "success": False,
-                    "error": f"El dispositivo {device_type} tardó demasiado en responder al comando '{action}'."
+                    "error": f"Tu dispositivo {device_type.upper()} no respondió a tiempo (posible reposo o sin señal)."
                 }
             except Exception as e:
                 logger.error(f"Error enviando comando a {device_type}: {e}")
-                return {"success": False, "error": str(e)}
+                return {"status": "error", "success": False, "error": str(e)}
             finally:
                 if request_id in self.pending_requests:
                     del self.pending_requests[request_id]

@@ -1,0 +1,9 @@
+{
+  "tv": {
+    "ip": "192.168.1.5",
+    "name": "Smart TV JVC 32 (Roku OS)",
+    "protocol": "roku_ecp",
+    "type": "smart_tv",
+    "port": 8060
+  }
+}

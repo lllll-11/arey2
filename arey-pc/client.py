@@ -127,6 +127,7 @@ class AreyPCClient:
 
             # 2. Respuesta de voz generada por el Cerebro de Arey
             elif msg_type == "brain_reply":
+                perf_tracker.end_stage("Red / Cloud Inferencia")
                 reply_text = data.get("text", "")
                 if reply_text:
                     ui_bridge.state_changed.emit("speaking")
@@ -134,6 +135,7 @@ class AreyPCClient:
                     await audio_pipeline.speak(reply_text)
                     ui_bridge.state_changed.emit("idle")
                     self.is_processing_voice = False
+                    perf_tracker.print_summary(reply_text)
 
             # 3. Telemetría de dispositivos (Celular, Smart TV)
             elif msg_type == "devices_update":
@@ -193,9 +195,13 @@ class AreyPCClient:
         else:
             return {"status": "error", "message": f"Acción '{action}' no soportada en PC."}
 
+from local_fast_path import local_fast_path
+from performance_tracker import perf_tracker
+
     async def _voice_loop(self):
         """
         Bucle de escucha continua: reacciona a 'Arey', Alt+Espacio o Clic.
+        Integra Fast-Path local (< 10ms) y observabilidad de latencia por etapas.
         """
         loop = asyncio.get_running_loop()
         while self.running:
@@ -211,18 +217,38 @@ class AreyPCClient:
                 detected = await loop.run_in_executor(executor, audio_pipeline.listen_for_wake_word)
 
             if detected:
+                perf_tracker.start_pipeline()
                 self.is_processing_voice = True
                 ui_bridge.state_changed.emit("listening")
                 ui_bridge.subtitle_changed.emit("status", "Escuchando... Habla ahora")
                 audio_pipeline.play_instant_wake()
 
-                # 2. Escuchar la orden del usuario con Whisper neuronal local (150ms)
+                # 2. Escuchar la orden con Whisper Small (int8) + Silero VAD
                 user_text = await loop.run_in_executor(executor, audio_pipeline.listen_command)
 
                 if user_text and user_text.strip():
                     logger.info(f"🗣️ Orden recibida: '{user_text}'")
                     ui_bridge.subtitle_changed.emit("user", user_text)
+
+                    # 3. FAST-PATH LOCAL: ¿Es un comando determinista de PC? (< 10ms)
+                    perf_tracker.start_stage("Fast-Path Router")
+                    local_match = local_fast_path.try_execute_local(user_text)
+                    perf_tracker.end_stage("Fast-Path Router")
+
+                    if local_match:
+                        action_name, reply_text = local_match
+                        logger.info(f"⚡ FAST-PATH LOCAL EJECUTADO: '{action_name}'")
+                        ui_bridge.state_changed.emit("speaking")
+                        ui_bridge.subtitle_changed.emit("arey", reply_text)
+                        await audio_pipeline.speak(reply_text)
+                        ui_bridge.state_changed.emit("idle")
+                        self.is_processing_voice = False
+                        perf_tracker.print_summary(user_text)
+                        continue
+
+                    # 4. Si requiere razonamiento / IA, enviar al servidor Cloud
                     ui_bridge.state_changed.emit("thinking")
+                    perf_tracker.start_stage("Red / Cloud Inferencia")
 
                     if self.ws:
                         await self.ws.send(json.dumps({
@@ -233,7 +259,10 @@ class AreyPCClient:
                         ui_bridge.subtitle_changed.emit("status", "Servidor no conectado temporalmente")
                         self.is_processing_voice = False
                 else:
-                    ui_bridge.subtitle_changed.emit("status", "No escuché ninguna orden. Di 'Arey' para intentar de nuevo")
+                    if audio_pipeline.should_suggest_recalibration():
+                        ui_bridge.subtitle_changed.emit("status", "Tip: Puedes recalibrar tu micrófono ejecutando 'entrenar_voz.bat'")
+                    else:
+                        ui_bridge.subtitle_changed.emit("status", "No escuché ninguna orden. Di 'Arey' para intentar de nuevo")
                     ui_bridge.state_changed.emit("idle")
                     self.is_processing_voice = False
 

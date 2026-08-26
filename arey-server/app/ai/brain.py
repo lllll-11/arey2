@@ -145,6 +145,50 @@ DEDUCE LA INTENCIÓN REAL, CORRÍGELA EN TU MENTE Y EJECUTA LA HERRAMIENTA ADECU
             if not self.client:
                 return "La clave de API de Gemini no está configurada en el servidor. Revisa tu archivo .env."
 
+    def _filter_tools_by_intent(self, text: str) -> List[Any]:
+        """
+        Enrutamiento jerárquico de tools en 2 pasos (Fase 5):
+        Clasifica la intención del usuario y devuelve únicamente el subconjunto relevante (3-6 tools),
+        reduciendo la latencia de inferencia y eliminando alucinaciones/ambigüedades.
+        """
+        t = text.lower()
+
+        # Dominio 1: Música y Media
+        if any(w in t for w in ["musica", "música", "cancion", "canción", "rola", "spotify", "youtube", "reproduce", "pon", "play", "track", "artista", "album", "queen", "bad bunny"]):
+            return [tool_play_music, tool_control_pc_media, tool_set_pc_volume, tool_save_personal_fact]
+
+        # Dominio 2: Teléfono Android
+        if any(w in t for w in ["llama", "marcar", "llamale", "whatsapp", "mensaje", "sms", "celular", "cel", "telefono", "teléfono", "linterna", "bateria", "batería", "notificacion"]):
+            return [tool_make_phone_call, tool_send_whatsapp, tool_send_sms, tool_find_my_phone, tool_set_phone_flashlight, tool_get_phone_status, tool_open_phone_app, tool_save_personal_fact]
+
+        # Dominio 3: Smart TV
+        if any(w in t for w in ["tele", "televisión", "television", "tv", "roku", "netflix", "prime video"]):
+            return [tool_control_smart_tv, tool_scan_network_devices, tool_save_personal_fact]
+
+        # Dominio 4: PC / Sistema & Búsqueda Web
+        if any(w in t for w in ["busca", "google", "web", "pagina", "página", "internet", "clima", "noticia", "pantalla", "lee", "captura", "screenshot", "recuerda", "agenda", "alarma", "recordatorio"]):
+            return [tool_open_website, tool_search_web_live, tool_take_pc_screenshot_and_analyze, tool_set_reminder, tool_open_pc_app, tool_save_personal_fact]
+
+        # Dominio 5: Conversación general / Mixto -> Paleta curada
+        return [
+            tool_play_music,
+            tool_make_phone_call,
+            tool_send_whatsapp,
+            tool_find_my_phone,
+            tool_control_smart_tv,
+            tool_search_web_live,
+            tool_save_personal_fact
+        ]
+
+    async def process_user_message(self, user_text: str, device_source: str = "pc") -> str:
+        """
+        Procesa el mensaje del usuario con la memoria compartida y ejecuta herramientas si es necesario.
+        """
+        if not self.client:
+            self._init_gemini()
+            if not self.client:
+                return "La clave de API de Gemini no está configurada en el servidor. Revisa tu archivo .env."
+
         # 1. Comprobar si coincide con alguna macro/rutina personalizada aprendida
         routine_result = await learning_engine.check_and_execute_routine(user_text)
         if routine_result:
@@ -155,8 +199,9 @@ DEDUCE LA INTENCIÓN REAL, CORRÍGELA EN TU MENTE Y EJECUTA LA HERRAMIENTA ADECU
         # 2. Registrar el mensaje del usuario en la memoria persistente
         await memory_manager.add_message(role="user", content=user_text, device_source=device_source)
 
-        # 3. Preparar el modelo Gemini con instrucciones y herramientas
+        # 3. Preparar el modelo Gemini con instrucciones y herramientas filtradas por dominio
         system_instruction = await self._build_system_instruction()
+        relevant_tools = self._filter_tools_by_intent(user_text)
 
         candidate_models = [
             "gemini-3.5-flash-lite",
@@ -185,7 +230,7 @@ DEDUCE LA INTENCIÓN REAL, CORRÍGELA EN TU MENTE Y EJECUTA LA HERRAMIENTA ADECU
                     model=model_name,
                     config=types.GenerateContentConfig(
                         system_instruction=system_instruction,
-                        tools=self.available_tools,
+                        tools=relevant_tools,
                         temperature=0.7
                     ),
                     history=history_contents
