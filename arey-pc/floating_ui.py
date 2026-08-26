@@ -129,7 +129,6 @@ def start_floating_ui(on_wake_callback=None, on_media_callback=None):
         frameless=True,
         easy_drag=True,
         transparent=True,
-        background_color='#00000000',
         on_top=True,
         js_api=js_api
     )
