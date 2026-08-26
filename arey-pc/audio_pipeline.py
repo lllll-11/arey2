@@ -3,11 +3,12 @@ import re
 import sys
 import json
 import time
+import io
 import asyncio
 import tempfile
 import threading
 import logging
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any, List, Tuple
 
 import speech_recognition as sr
 import edge_tts
@@ -25,8 +26,11 @@ audio_lock = threading.Lock()
 
 class AudioPipeline:
     """
-    Pipeline de audio de alta precisión fonética con Faster-Whisper 'small' (int8),
-    Silero VAD y procesamiento en memoria RAM sin escritura en disco.
+    Pipeline de audio de ultra-baja latencia con Ejecución Directa en Un Solo Aliento:
+    - Faster-Whisper Small (int8) con multi-threading en CPU (4 hilos).
+    - Detección inteligente: Si dices "Arey abre Chrome", ejecuta la orden de inmediato en < 500ms
+      sin pedirte que te esperes al 'Sí'.
+    - In-Memory TTS Streaming sin escrituras lentas en disco.
     """
     def __init__(self):
         if not pygame.mixer.get_init():
@@ -35,20 +39,21 @@ class AudioPipeline:
         self.recognizer = sr.Recognizer()
         self.recognizer.energy_threshold = 80
         self.recognizer.dynamic_energy_threshold = False
-        self.recognizer.pause_threshold = 0.85 # Margen cómodo de pausas naturales
-        self.recognizer.non_speaking_duration = 0.35
+        self.recognizer.pause_threshold = 0.50 # Pausa equilibrada y natural
+        self.recognizer.non_speaking_duration = 0.20
 
         self.microphone = self._get_best_microphone()
         self.consecutive_empty_count = 0
 
-        # Cargar Faster-Whisper Small cuantizado en int8 para CPU
-        logger.info("🧠 Cargando modelo neuronal Faster-Whisper 'small' (int8)...")
+        # Cargar Faster-Whisper Small cuantizado en int8 con 4 hilos en CPU
+        num_threads = min(4, os.cpu_count() or 2)
+        logger.info(f"🧠 Cargando Faster-Whisper 'small' (int8, {num_threads} hilos CPU)...")
         try:
-            self.whisper = WhisperModel("small", device="cpu", compute_type="int8")
-            logger.info("✅ Faster-Whisper 'small' listo con máxima precisión fonética.")
+            self.whisper = WhisperModel("small", device="cpu", compute_type="int8", cpu_threads=num_threads)
+            logger.info("✅ Faster-Whisper 'small' listo.")
         except Exception as e:
-            logger.warning(f"Fallback a 'base' por error ({e})...")
-            self.whisper = WhisperModel("base", device="cpu", compute_type="int8")
+            logger.warning(f"Fallback a 'base' ({e})...")
+            self.whisper = WhisperModel("base", device="cpu", compute_type="int8", cpu_threads=num_threads)
 
         self.assets_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "assets"))
         os.makedirs(self.assets_dir, exist_ok=True)
@@ -116,7 +121,7 @@ class AudioPipeline:
 
     def transcribe_audio(self, audio_data: sr.AudioData) -> str:
         """
-        Transcripción neuronal directa en memoria RAM con Faster-Whisper Small + Silero VAD.
+        Transcripción en memoria RAM con Faster-Whisper + Silero VAD.
         """
         perf_tracker.start_stage("Whisper STT (Small)")
         profile = self.get_user_profile()
@@ -133,9 +138,9 @@ class AudioPipeline:
                 beam_size=1,
                 vad_filter=True,
                 vad_parameters=dict(
-                    min_silence_duration_ms=250,
-                    speech_pad_ms=80,
-                    threshold=0.45
+                    min_silence_duration_ms=200,
+                    speech_pad_ms=60,
+                    threshold=0.40
                 ),
                 initial_prompt=prompt
             )
@@ -147,7 +152,13 @@ class AudioPipeline:
             perf_tracker.end_stage("Whisper STT (Small)")
             return ""
 
-    def listen_for_wake_word(self, timeout: float = 0.8, phrase_time_limit: float = 2.5) -> bool:
+    def listen_for_wake_word(self, timeout: float = 0.8, phrase_time_limit: float = 3.5) -> Tuple[bool, str]:
+        """
+        Escucha continua:
+        Retorna (detected, direct_command).
+        Si el usuario dijo: 'Arey, ¿cuál es el clima?' -> direct_command = '¿cuál es el clima?'
+        Si el usuario solo dijo: 'Arey' -> direct_command = ''
+        """
         profile = self.get_user_profile()
         wake_words = list(set(self.base_wake_words + profile.get("custom_wake_words", [])))
         threshold = profile.get("calibrated_energy_threshold", 80)
@@ -159,19 +170,31 @@ class AudioPipeline:
                     try:
                         audio = self.recognizer.listen(source, timeout=timeout, phrase_time_limit=phrase_time_limit)
                     except sr.WaitTimeoutError:
-                        return False
+                        return False, ""
 
-            text = self.transcribe_audio(audio).lower().strip()
-            if text:
-                logger.info(f"🔊 Escuchado: '{text}'")
-                if any(w in text for w in wake_words):
-                    logger.info(f"✨ ¡Palabra de activación detectada! -> '{text}'")
-                    return True
+            text = self.transcribe_audio(audio)
+            if not text:
+                return False, ""
+
+            text_lower = text.lower().strip()
+            logger.info(f"🔊 Escuchado: '{text}'")
+
+            # Buscar si contiene la palabra de activación
+            for w in wake_words:
+                pattern = rf"\b{re.escape(w)}\b"
+                match = re.search(pattern, text_lower)
+                if match:
+                    # Extraer el comando directo si el usuario lo dijo todo junto
+                    cmd_part = text_lower[match.end():].strip(" ,.:;!?")
+                    logger.info(f"✨ ¡Palabra de activación detectada! -> '{text}' (Comando directo: '{cmd_part}')")
+                    return True, cmd_part
+
         except Exception:
-            time.sleep(0.1)
-        return False
+            time.sleep(0.05)
 
-    def listen_command(self, timeout: float = 6.0, phrase_time_limit: float = 12.0) -> str:
+        return False, ""
+
+    def listen_command(self, timeout: float = 5.0, phrase_time_limit: float = 10.0) -> str:
         time.sleep(0.02)
         perf_tracker.start_stage("Captura Micrófono")
         try:
@@ -210,22 +233,21 @@ class AudioPipeline:
         perf_tracker.start_stage("TTS Síntesis & Audio")
         logger.info(f"Arey: '{text[:60]}...' " if len(text) > 60 else f"Arey: '{text}'")
         try:
-            with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as fp:
-                temp_path = fp.name
-
             communicate = edge_tts.Communicate(text, voice=VOICE_NAME, rate="+15%", pitch="+0Hz")
-            await communicate.save(temp_path)
+            audio_buffer = bytearray()
 
-            pygame.mixer.music.load(temp_path)
-            pygame.mixer.music.play()
-            while pygame.mixer.music.get_busy():
-                await asyncio.sleep(0.03)
+            async for chunk in communicate.stream():
+                if chunk["type"] == "audio":
+                    audio_buffer.extend(chunk["data"])
 
-            pygame.mixer.music.unload()
-            try:
-                os.remove(temp_path)
-            except Exception:
-                pass
+            if audio_buffer:
+                sound_stream = io.BytesIO(audio_buffer)
+                pygame.mixer.music.load(sound_stream)
+                pygame.mixer.music.play()
+                while pygame.mixer.music.get_busy():
+                    await asyncio.sleep(0.03)
+                pygame.mixer.music.unload()
+
         except Exception as e:
             logger.error(f"Error en síntesis de voz: {e}")
         finally:

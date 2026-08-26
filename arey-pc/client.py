@@ -124,23 +124,27 @@ class AreyPCClient:
             if not self.is_processing_voice:
                 ui_bridge.emit_state("idle")
 
-            # 1. Comprobar si se activó por atajo o esperar palabra de activación 'Arey'
+            # 1. Comprobar si se activó por atajo o escuchar en vivo
             is_manual = self.force_wake_event.is_set()
             if is_manual:
                 self.force_wake_event.clear()
-                detected = True
+                detected, direct_cmd = True, ""
             else:
-                detected = await loop.run_in_executor(executor, audio_pipeline.listen_for_wake_word)
+                detected, direct_cmd = await loop.run_in_executor(executor, audio_pipeline.listen_for_wake_word)
 
             if detected:
                 perf_tracker.start_pipeline()
                 self.is_processing_voice = True
                 ui_bridge.emit_state("listening")
-                ui_bridge.emit_subtitle("status", "Escuchando... Habla ahora")
-                audio_pipeline.play_instant_wake()
 
-                # 2. Transcripción neuronal local con Whisper Small (int8) + Silero VAD
-                user_text = await loop.run_in_executor(executor, audio_pipeline.listen_command)
+                # 2. Si el usuario dijo la orden completa de un solo golpe, ejecutar de inmediato
+                if direct_cmd and len(direct_cmd.strip()) > 1:
+                    user_text = direct_cmd
+                    logger.info(f"⚡ COMANDO EN UN SOLO ALIENTO DETECTADO: '{user_text}'")
+                else:
+                    ui_bridge.emit_subtitle("status", "Escuchando... Habla ahora")
+                    audio_pipeline.play_instant_wake()
+                    user_text = await loop.run_in_executor(executor, audio_pipeline.listen_command)
 
                 if user_text and user_text.strip():
                     logger.info(f"🗣️ Andriy: '{user_text}'")
