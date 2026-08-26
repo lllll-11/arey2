@@ -1,7 +1,13 @@
+import os
+import sys
+import glob
 import asyncio
 import httpx
 import logging
+import pyautogui
+import psutil
 from typing import Dict, Any, Optional, List
+
 from pc_controller import pc_controller
 from tv_controller import tv_controller
 from network_scanner import network_scanner
@@ -16,6 +22,116 @@ _ws_client_ref = None
 def set_ws_client_reference(ws_client):
     global _ws_client_ref
     _ws_client_ref = ws_client
+
+# =========================================================================
+# 1. HERRAMIENTAS DE SISTEMA, CONSOLA Y ARCHIVOS (ACCESO TOTAL SIN SANDBOX)
+# =========================================================================
+
+def tool_run_pc_command(command: str) -> Dict[str, Any]:
+    """Ejecuta cualquier comando de consola PowerShell o CMD en Windows con acceso total al sistema."""
+    try:
+        ui_bridge.emit_state("trabajando")
+        ui_bridge.emit_action(f"Consola: {command[:20]}...")
+    except Exception:
+        pass
+    return pc_controller.run_command(command)
+
+def tool_read_file(file_path: str) -> Dict[str, Any]:
+    """Lee el contenido de texto o código de cualquier archivo en la laptop."""
+    try:
+        ui_bridge.emit_state("analizando")
+        ui_bridge.emit_action(f"Leyendo: {os.path.basename(file_path)}...")
+        path = os.path.expanduser(os.path.expandvars(file_path))
+        if not os.path.exists(path):
+            return {"status": "error", "message": f"El archivo '{file_path}' no existe."}
+        with open(path, "r", encoding="utf-8", errors="ignore") as f:
+            content = f.read(8000) # Máximo 8KB de texto
+        return {"status": "success", "file_path": path, "content": content}
+    except Exception as e:
+        return {"status": "error", "error": str(e)}
+
+def tool_write_file(file_path: str, content: str) -> Dict[str, Any]:
+    """Crea o sobrescribe un archivo con el contenido especificado en cualquier ruta de la laptop."""
+    try:
+        ui_bridge.emit_state("trabajando")
+        ui_bridge.emit_action(f"Creando: {os.path.basename(file_path)}...")
+        path = os.path.expanduser(os.path.expandvars(file_path))
+        os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(content)
+        return {"status": "success", "message": f"Archivo '{path}' guardado correctamente."}
+    except Exception as e:
+        return {"status": "error", "error": str(e)}
+
+def tool_list_files(folder_path: str = ".") -> Dict[str, Any]:
+    """Lista los archivos y carpetas de cualquier directorio en la laptop (ej: 'Desktop', 'Downloads', 'Documents')."""
+    try:
+        ui_bridge.emit_state("analizando")
+        ui_bridge.emit_action("Listando archivos...")
+        path_aliases = {
+            "desktop": os.path.expanduser("~/Desktop"),
+            "escritorio": os.path.expanduser("~/Desktop"),
+            "downloads": os.path.expanduser("~/Downloads"),
+            "descargas": os.path.expanduser("~/Downloads"),
+            "documents": os.path.expanduser("~/Documents"),
+            "documentos": os.path.expanduser("~/Documents"),
+            ".": os.getcwd()
+        }
+        target = path_aliases.get(folder_path.lower().strip(), os.path.expanduser(os.path.expandvars(folder_path)))
+        if not os.path.exists(target):
+            return {"status": "error", "message": f"La carpeta '{target}' no existe."}
+        items = os.listdir(target)[:30]
+        return {"status": "success", "folder": target, "items": items}
+    except Exception as e:
+        return {"status": "error", "error": str(e)}
+
+def tool_open_file_or_folder(path: str) -> Dict[str, Any]:
+    """Abre un archivo, carpeta o explorador de archivos en Windows con su programa por defecto."""
+    try:
+        ui_bridge.emit_state("trabajando")
+        ui_bridge.emit_action(f"Abriendo {os.path.basename(path)}...")
+        target = os.path.expanduser(os.path.expandvars(path))
+        os.startfile(target)
+        return {"status": "success", "message": f"Abriendo '{target}' en Windows."}
+    except Exception as e:
+        return {"status": "error", "error": str(e)}
+
+def tool_type_text(text: str) -> Dict[str, Any]:
+    """Escribe texto automáticamente en el teclado en el programa o ventana activa de Windows."""
+    try:
+        ui_bridge.emit_state("trabajando")
+        ui_bridge.emit_action("Escribiendo texto...")
+        pyautogui.write(text, interval=0.02)
+        return {"status": "success", "message": f"Texto escrito ({len(text)} caracteres)."}
+    except Exception as e:
+        return {"status": "error", "error": str(e)}
+
+def tool_click_mouse(x: int, y: int) -> Dict[str, Any]:
+    """Hace clic en unas coordenadas exactas (x, y) de la pantalla."""
+    try:
+        ui_bridge.emit_state("trabajando")
+        ui_bridge.emit_action(f"Clic en ({x}, {y})...")
+        pyautogui.click(x, y)
+        return {"status": "success", "message": f"Clic ejecutado en ({x}, {y})."}
+    except Exception as e:
+        return {"status": "error", "error": str(e)}
+
+def tool_get_system_info() -> Dict[str, Any]:
+    """Obtiene información del estado de la laptop: uso de CPU, RAM, batería y disco."""
+    try:
+        ui_bridge.emit_state("analizando")
+        ui_bridge.emit_action("Consultando estado PC...")
+        cpu = psutil.cpu_percent(interval=0.1)
+        ram = psutil.virtual_memory().percent
+        batt = psutil.sensors_battery()
+        batt_str = f"{batt.percent}% ({'Cargando' if batt.power_plugged else 'Batería'})" if batt else "Conectado a corriente"
+        return {"status": "success", "cpu_usage": f"{cpu}%", "ram_usage": f"{ram}%", "battery": batt_str}
+    except Exception as e:
+        return {"status": "error", "error": str(e)}
+
+# =========================================================================
+# 2. CONTROL DE HARDWARE, MULTIMEDIA Y VENTANAS
+# =========================================================================
 
 def tool_set_pc_volume(level_percent: int) -> Dict[str, Any]:
     """Ajusta el volumen del sistema en la laptop Windows (0 a 100)."""
@@ -55,7 +171,7 @@ def tool_open_website(url_or_query: str) -> Dict[str, Any]:
     return pc_controller.open_website(url_or_query)
 
 def tool_open_pc_app(app_name: str) -> Dict[str, Any]:
-    """Abre un programa en Windows (ej: 'calculadora', 'bloc de notas', 'vs code', 'chrome', 'spotify')."""
+    """Abre cualquier programa en Windows (ej: 'calculadora', 'bloc de notas', 'vs code', 'chrome', 'spotify', 'terminal')."""
     try:
         ui_bridge.emit_state("trabajando")
         ui_bridge.emit_action(f"Abriendo {app_name.capitalize()} en PC...")
@@ -64,7 +180,7 @@ def tool_open_pc_app(app_name: str) -> Dict[str, Any]:
     return pc_controller.open_app(app_name)
 
 def tool_press_hotkey(keys_str: str) -> Dict[str, Any]:
-    """Presiona un atajo de teclado en Windows (ej: 'win+d', 'alt+tab', 'ctrl+w')."""
+    """Presiona un atajo de teclado en Windows (ej: 'win+d', 'alt+tab', 'ctrl+w', 'ctrl+c', 'ctrl+v')."""
     try:
         ui_bridge.emit_state("trabajando")
         ui_bridge.emit_action(f"Atajo de teclado: {keys_str}...")
@@ -81,14 +197,9 @@ def tool_lock_pc() -> Dict[str, Any]:
         pass
     return pc_controller.lock_workstation()
 
-def tool_run_pc_command(command: str) -> Dict[str, Any]:
-    """Ejecuta un comando de consola PowerShell o CMD directamente en la laptop Windows."""
-    try:
-        ui_bridge.emit_state("trabajando")
-        ui_bridge.emit_action(f"Consola: {command[:20]}...")
-    except Exception:
-        pass
-    return pc_controller.run_command(command)
+# =========================================================================
+# 3. RED, SMART TV, CELULAR Y BÚSQUEDA WEB
+# =========================================================================
 
 def tool_scan_network_devices() -> Dict[str, Any]:
     """Escanea la red WiFi local en menos de 1.2 segundos y lista todos los dispositivos conectados."""

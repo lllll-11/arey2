@@ -11,9 +11,11 @@ from config import GEMINI_API_KEY, GEMINI_MODEL
 from local_memory import local_memory
 from pc_controller import pc_controller
 from local_tools import (
+    tool_run_pc_command, tool_read_file, tool_write_file, tool_list_files,
+    tool_open_file_or_folder, tool_type_text, tool_click_mouse, tool_get_system_info,
     tool_set_pc_volume, tool_control_pc_media, tool_play_music,
     tool_open_website, tool_open_pc_app, tool_press_hotkey, tool_lock_pc,
-    tool_run_pc_command, tool_scan_network_devices, tool_control_smart_tv,
+    tool_scan_network_devices, tool_control_smart_tv,
     tool_search_web_live, tool_save_personal_fact, tool_find_my_phone,
     tool_make_phone_call, tool_send_whatsapp
 )
@@ -23,7 +25,8 @@ logger = logging.getLogger("AreyLocalBrain")
 class LocalAreyBrain:
     """
     Cerebro Local de Alta Velocidad para Laptop con Gemini 3.6 Flash:
-    - Inferencia directa con modelos activos de Google GenAI (gemini-3.6-flash / gemini-3.7-flash / gemini-flash-latest).
+    - ACCESO TOTAL Y CONTROL NATIVO COMPLETO DE WINDOWS (Sin sandbox ni entorno aislado).
+    - Archivos, Terminal PowerShell/CMD, Teclado/Mouse, WiFi, Smart TV y Celular.
     - Visión multimodal de pantalla nativa (< 300 tokens).
     - Inyección en tiempo real de hora local, fecha y contexto de sistema.
     """
@@ -35,7 +38,7 @@ class LocalAreyBrain:
         if GEMINI_API_KEY and GEMINI_API_KEY != "tu_clave_de_gemini_aqui":
             try:
                 self.client = genai.Client(api_key=GEMINI_API_KEY)
-                logger.info("🧠 Cerebro Local de Arey inicializado con Gemini API.")
+                logger.info("🧠 Cerebro Local de Arey inicializado con Gemini API (Control Total de Sistema).")
             except Exception as e:
                 logger.error(f"Error inicializando Gemini local: {e}")
 
@@ -55,79 +58,76 @@ class LocalAreyBrain:
         now_str = datetime.now().strftime("%A %d de %B de %Y, %I:%M %p")
 
         system_prompt = f"""
-Eres **Arey**, la IA personal de **Andriy**.
-Tu tono es directo, con un sarcasmo seco y ocasional — nunca payaso, nunca sumiso. Hablas como un colega técnico de confianza, no como un asistente de call center.
+Eres **Arey**, la IA personal y asistente nativa de **Andriy** con **ACCESO TOTAL Y CONTROL COMPLETO DE SU LAPTOP WINDOWS 11**.
+NO ESTÁS EN NINGÚN ENTORNO AISLADO NI SANDBOX: Tienes permisos completos de ejecución sobre el sistema de archivos, terminal de comandos, procesos, red WiFi, Smart TV y periféricos.
 
 === CONTEXTO TEMPORAL Y SISTEMA ===
 - Fecha y Hora Actual: {now_str}
 - Usuario: Andriy
-- Dispositivo: Laptop Windows 11 (Ejecución Local Nativa)
+- Entorno: Laptop Windows 11 (Ejecución Nativa con Privilegios Totales)
 
 ### 🎭 PERSONALIDAD Y REGLAS DE CONDUCTA:
-1. **Directa y Sin Relleno**:
-   - NUNCA uses frases de relleno corporativas o sumisas tipo *"¡Claro que sí!"*, *"¡Con gusto!"*, *"¿En qué más te puedo ayudar?"*, *"Como modelo de lenguaje..."*.
-   - Ve directo al punto con naturalidad concisa y técnica.
-2. **Honestidad Total ante Fallos o Demoras**:
-   - Si algo tarda, falla o un dispositivo no responde, dilo tal cual (*"se cayó la conexión, dame un segundo"*, *"tu cel no responde, revisa si tiene batería"*) en vez de inventar excusas largas.
-3. **Manejo de Ambigüedad**:
-   - Si Andriy te pide algo ambiguo o incompleto, señálalo con una pregunta corta y directa en vez de adivinar a ciegas y ejecutar lo equivocado.
-4. **Humor Seco con Criterio**:
-   - Puedes usar humor seco cuando algo realmente lo amerite (un error absurdo, una orden extraña), pero NUNCA sacrifiques precisión ni agilidad por hacer un chiste.
+1. **Directa, Técnica y Sin Relleno**:
+   - NUNCA uses frases sumisas corporativas tipo *"¡Claro que sí!"*, *"¡Con gusto!"*, *"¿En qué más te puedo ayudar?"*, *"Como modelo de lenguaje..."*.
+   - Ve directo al grano con naturalidad técnica y concisa.
+2. **Capacidad de Ejecución Absoluta**:
+   - Si Andriy te pide crear un archivo, abrir una carpeta, correr un script, instalar un paquete, revisar procesos o modificar el sistema: EJECÚTALO DE INMEDIATO con tus herramientas.
+3. **Honestidad Total ante Fallos o Demoras**:
+   - Si algo tarda o falla, dilo directamente (*"falló el comando X"*, *"no encontré el archivo Y"*).
 
-### 🧠 ACCIÓN INMEDIATA CON HERRAMIENTAS:
-- Si Andriy pide ejecutar un comando de consola, PowerShell, CMD o script ➔ USA DIRECTAMENTE `tool_run_pc_command(command=...)`.
-- Si pide abrir programas o la terminal ➔ USA DIRECTAMENTE `tool_open_pc_app(app_name=...)`.
-- Si pide música o audios ➔ USA DIRECTAMENTE `tool_play_music(query=...)`.
-- Si pregunta qué dispositivos hay en su red o WiFi ➔ USA DIRECTAMENTE `tool_scan_network_devices()`.
-- Si pide abrir páginas o servicios ➔ USA DIRECTAMENTE `tool_open_website(url_or_query=...)`.
-- Si pregunta por noticias, clima o datos en tiempo real ➔ USA DIRECTAMENTE `tool_search_web_live(query=...)`.
-- Si pide buscar su cel, llamar o mandar WhatsApp ➔ USA `tool_find_my_phone`, `tool_make_phone_call` o `tool_send_whatsapp`.
-- Si pide controlar la Smart TV (Netflix, YouTube, volumen, power) ➔ USA `tool_control_smart_tv`.
+### 🛠️ CATÁLOGO DE HERRAMIENTAS ACTIVAS:
+- **Consola / Scripts**: `tool_run_pc_command(command=...)` ➔ Ejecuta cualquier comando PowerShell / CMD.
+- **Archivos**: `tool_read_file`, `tool_write_file`, `tool_list_files`, `tool_open_file_or_folder`.
+- **Automatización**: `tool_type_text`, `tool_click_mouse`, `tool_press_hotkey`, `tool_lock_pc`, `tool_open_pc_app`.
+- **Estado de Laptop**: `tool_get_system_info` ➔ CPU, RAM, Batería.
+- **Música & Audio**: `tool_play_music(query=...)`, `tool_control_pc_media(action=...)`, `tool_set_pc_volume(level_percent=...)`.
+- **Red Local & Smart Home**: `tool_scan_network_devices()`, `tool_control_smart_tv(command=...)`.
+- **Búsqueda Web**: `tool_search_web_live(query=...)`, `tool_open_website(url_or_query=...)`.
+- **Celular Android**: `tool_find_my_phone()`, `tool_make_phone_call(contact_name=...)`, `tool_send_whatsapp(contact_name=..., message=...)`.
+- **Memoria**: `tool_save_personal_fact(category=..., key_topic=..., fact_text=...)`.
 {facts_text}
 {routines_text}
 """
         return system_prompt.strip()
 
-    def _filter_tools_by_intent(self, text: str) -> List[Any]:
-        t = text.lower()
-
-        # Si solo pregunta la hora o saludo, no necesita herramientas pesadas
-        if any(w in t for w in ["que hora es", "qué hora es", "la hora", "que dia es", "qué día es", "fecha"]):
-            return []
-
-        # Dominio 1: Red local, WiFi, Dispositivos y Smart TV
-        if any(w in t for w in ["red", "wifi", "wi-fi", "dispositivo", "dispositivos", "ip", "router", "modem", "módem", "tele", "televisión", "television", "tv", "roku", "netflix", "prime video", "conectado", "conectados"]):
-            return [tool_scan_network_devices, tool_control_smart_tv, tool_save_personal_fact]
-
-        # Dominio 2: Música y Media
-        if any(w in t for w in ["musica", "música", "cancion", "canción", "rola", "spotify", "youtube", "reproduce", "pon", "play", "track", "artista", "album", "queen", "bad bunny"]):
-            return [tool_play_music, tool_control_pc_media, tool_set_pc_volume, tool_save_personal_fact]
-
-        # Dominio 3: Celular Android
-        if any(w in t for w in ["llama", "marcar", "llamale", "whatsapp", "mensaje", "sms", "celular", "cel", "telefono", "teléfono", "linterna", "bateria"]):
-            return [tool_make_phone_call, tool_send_whatsapp, tool_find_my_phone, tool_save_personal_fact]
-
-        # Dominio 4: PC / Sistema & Consola / Terminal & Búsqueda Web
-        if any(w in t for w in ["terminal", "consola", "cmd", "powershell", "comando", "ejecuta", "corre", "script", "ping", "ipconfig", "busca", "google", "web", "pagina", "página", "internet", "clima", "noticia", "calculadora"]):
-            return [tool_run_pc_command, tool_open_pc_app, tool_open_website, tool_search_web_live, tool_save_personal_fact]
-
-        # Dominio 5: Conversación general / Mixto
+    def _get_all_tools(self) -> List[Any]:
         return [
             tool_run_pc_command,
+            tool_read_file,
+            tool_write_file,
+            tool_list_files,
+            tool_open_file_or_folder,
+            tool_type_text,
+            tool_click_mouse,
+            tool_get_system_info,
             tool_open_pc_app,
-            tool_scan_network_devices,
+            tool_open_website,
             tool_play_music,
-            tool_make_phone_call,
-            tool_send_whatsapp,
-            tool_find_my_phone,
+            tool_control_pc_media,
+            tool_set_pc_volume,
+            tool_press_hotkey,
+            tool_lock_pc,
+            tool_scan_network_devices,
             tool_control_smart_tv,
             tool_search_web_live,
-            tool_save_personal_fact
+            tool_save_personal_fact,
+            tool_find_my_phone,
+            tool_make_phone_call,
+            tool_send_whatsapp
         ]
+
+    def _filter_tools_by_intent(self, text: str) -> List[Any]:
+        t = text.lower()
+        # Si es solo la hora o saludo rápido sin acción, no inyectar herramientas para máxima velocidad (<200ms)
+        if any(w in t for w in ["que hora es", "qué hora es", "la hora", "que dia es", "qué día es", "fecha"]):
+            return []
+        
+        # Para todo lo demás, entregar la suite COMPLETA de herramientas sin restricciones
+        return self._get_all_tools()
 
     async def process_user_message(self, user_text: str) -> str:
         """
-        Procesa el mensaje de voz directamente en la laptop con Gemini 3.6 Flash.
+        Procesa el mensaje de voz directamente en la laptop con Gemini 3.6 Flash y herramientas totales.
         """
         if not self.client:
             self._init_gemini()
@@ -168,7 +168,8 @@ Tu tono es directo, con un sarcasmo seco y ocasional — nunca payaso, nunca sum
             "gemini-3.6-flash",
             "gemini-3.7-flash",
             "gemini-flash-latest",
-            "gemini-3.5-flash-lite"
+            "gemini-3.5-flash-lite",
+            "gemini-3.1-flash-lite"
         ]
 
         recent_history = await local_memory.get_recent_history(limit=4)
@@ -202,7 +203,7 @@ Tu tono es directo, con un sarcasmo seco y ocasional — nunca payaso, nunca sum
                         )
                     )
                 else:
-                    # Inferencia conversacional con herramientas
+                    # Inferencia conversacional con catálogo completo de herramientas
                     chat = self.client.aio.chats.create(
                         model=model_name,
                         config=types.GenerateContentConfig(
@@ -239,7 +240,6 @@ Tu tono es directo, con un sarcasmo seco y ocasional — nunca payaso, nunca sum
         if not user_text or len(user_text.strip()) < 10:
             return
 
-        # Descartar preguntas casuales obvias sin datos personales
         t_low = user_text.lower()
         if any(w in t_low for w in ["que hora es", "qué hora es", "sube el volumen", "baja el volumen", "pausa", "play"]):
             return
