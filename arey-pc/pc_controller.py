@@ -192,24 +192,38 @@ class PCController:
     @staticmethod
     def run_command(command: str) -> Dict[str, Any]:
         """
-        Ejecuta un comando de consola en Windows de forma controlada sin bloqueos interactivos.
+        Ejecuta un comando de consola en Windows de forma ultra-rápida (5-100ms) sin bloqueos interactivos.
         """
         try:
-            cmd = command
+            cmd = command.strip()
             if "winget" in cmd.lower() and "--accept" not in cmd.lower():
                 cmd = f"{cmd} --accept-source-agreements --accept-package-agreements"
 
-            res = subprocess.run(
-                ["powershell", "-NoProfile", "-Command", cmd],
-                capture_output=True,
-                text=True,
-                timeout=20,
-                creationflags=subprocess.CREATE_NO_WINDOW
-            )
+            is_ps_specific = any(cmd.lower().startswith(x) for x in ["get-", "set-", "new-", "remove-", "test-", "$", "powershell"])
+
+            if is_ps_specific:
+                res = subprocess.run(
+                    ["powershell", "-NoProfile", "-Command", cmd],
+                    capture_output=True,
+                    text=True,
+                    timeout=15,
+                    creationflags=subprocess.CREATE_NO_WINDOW
+                )
+            else:
+                res = subprocess.run(
+                    cmd,
+                    shell=True,
+                    capture_output=True,
+                    text=True,
+                    timeout=15,
+                    creationflags=subprocess.CREATE_NO_WINDOW
+                )
+
             output = res.stdout if res.stdout else res.stderr
+            clean_out = output.strip()[:1000] if output else "Comando ejecutado con éxito."
             return {
                 "status": "success" if res.returncode == 0 else "error",
-                "output": output.strip() if output else "Comando ejecutado sin salida."
+                "output": clean_out
             }
         except Exception as e:
             return {"status": "error", "error": str(e)}

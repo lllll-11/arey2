@@ -140,10 +140,10 @@ class AudioPipeline:
 
     def listen_command(self, timeout: Optional[float] = 5.0, phrase_time_limit: float = 20.0, is_music_active: bool = False) -> str:
         """
-        Escucha continua del micrófono con ventana extendida de 1.4s para no cortar oraciones a medias.
+        Escucha continua del micrófono optimizada para mínima latencia (<1.0s de cierre).
         """
-        self.recognizer.pause_threshold = 1.4
-        self.recognizer.non_speaking_duration = 0.6
+        self.recognizer.pause_threshold = 1.0
+        self.recognizer.non_speaking_duration = 0.4
         if is_music_active:
             self.recognizer.energy_threshold = 280
         else:
