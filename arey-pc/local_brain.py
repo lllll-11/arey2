@@ -66,6 +66,7 @@ Tu tono es directo, con un sarcasmo seco y ocasional — nunca payaso, nunca sum
 
 ### 🧠 ACCIÓN INMEDIATA CON HERRAMIENTAS:
 - Si Andriy pide música o audios ➔ USA DIRECTAMENTE `tool_play_music(query=...)`.
+- Si Andriy pregunta qué dispositivos hay en su red o WiFi ➔ USA DIRECTAMENTE `tool_scan_network_devices()`.
 - Si pide abrir páginas o servicios ➔ USA DIRECTAMENTE `tool_open_website(url_or_query=...)`.
 - Si pregunta por noticias, clima o datos en tiempo real ➔ USA DIRECTAMENTE `tool_search_web_live(query=...)`.
 - Si pide buscar su cel, llamar o mandar WhatsApp ➔ USA `tool_find_my_phone`, `tool_make_phone_call` o `tool_send_whatsapp`.
@@ -83,17 +84,17 @@ Tu tono es directo, con un sarcasmo seco y ocasional — nunca payaso, nunca sum
     def _filter_tools_by_intent(self, text: str) -> List[Any]:
         t = text.lower()
 
-        # Dominio 1: Música y Media
+        # Dominio 1: Red local, WiFi, Dispositivos y Smart TV
+        if any(w in t for w in ["red", "wifi", "wi-fi", "dispositivo", "dispositivos", "ip", "router", "modem", "módem", "tele", "televisión", "television", "tv", "roku", "netflix", "prime video", "conectado", "conectados"]):
+            return [tool_scan_network_devices, tool_control_smart_tv, tool_save_personal_fact]
+
+        # Dominio 2: Música y Media
         if any(w in t for w in ["musica", "música", "cancion", "canción", "rola", "spotify", "youtube", "reproduce", "pon", "play", "track", "artista", "album", "queen", "bad bunny"]):
             return [tool_play_music, tool_control_pc_media, tool_set_pc_volume, tool_save_personal_fact]
 
-        # Dominio 2: Celular Android
+        # Dominio 3: Celular Android
         if any(w in t for w in ["llama", "marcar", "llamale", "whatsapp", "mensaje", "sms", "celular", "cel", "telefono", "teléfono", "linterna", "bateria"]):
             return [tool_make_phone_call, tool_send_whatsapp, tool_find_my_phone, tool_save_personal_fact]
-
-        # Dominio 3: Smart TV
-        if any(w in t for w in ["tele", "televisión", "television", "tv", "roku", "netflix", "prime video"]):
-            return [tool_control_smart_tv, tool_scan_network_devices, tool_save_personal_fact]
 
         # Dominio 4: PC / Sistema & Búsqueda Web
         if any(w in t for w in ["busca", "google", "web", "pagina", "página", "internet", "clima", "noticia", "pantalla", "lee", "captura", "screenshot", "recuerda", "agenda", "alarma"]):
@@ -101,6 +102,7 @@ Tu tono es directo, con un sarcasmo seco y ocasional — nunca payaso, nunca sum
 
         # Dominio 5: Conversación general / Mixto
         return [
+            tool_scan_network_devices,
             tool_play_music,
             tool_make_phone_call,
             tool_send_whatsapp,

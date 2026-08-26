@@ -1,7 +1,15 @@
 import os
 from dotenv import load_dotenv
 
-load_dotenv()
+ENV_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), ".env"))
+SERVER_ENV = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "arey-server", ".env"))
+
+if os.path.exists(ENV_PATH):
+    load_dotenv(ENV_PATH)
+elif os.path.exists(SERVER_ENV):
+    load_dotenv(SERVER_ENV)
+else:
+    load_dotenv()
 
 # Inteligencia Artificial Gemini Local Directa
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
