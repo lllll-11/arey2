@@ -1,5 +1,5 @@
 {
-  "calibrated_energy_threshold": 70,
+  "calibrated_energy_threshold": 160,
   "user_name": "Andriy",
   "custom_wake_words": [
     "arey",

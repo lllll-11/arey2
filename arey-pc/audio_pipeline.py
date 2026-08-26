@@ -37,10 +37,12 @@ class AudioPipeline:
             pygame.mixer.init()
 
         self.recognizer = sr.Recognizer()
-        self.recognizer.energy_threshold = 80
-        self.recognizer.dynamic_energy_threshold = False
-        self.recognizer.pause_threshold = 0.50 # Pausa equilibrada y natural
-        self.recognizer.non_speaking_duration = 0.20
+        self.recognizer.energy_threshold = 160
+        self.recognizer.dynamic_energy_threshold = True
+        self.recognizer.dynamic_energy_adjustment_damping = 0.15
+        self.recognizer.dynamic_energy_ratio = 1.5
+        self.recognizer.pause_threshold = 0.35 # Corta inmediatamente a los 350ms de silencio
+        self.recognizer.non_speaking_duration = 0.15
 
         self.microphone = self._get_best_microphone()
         self.consecutive_empty_count = 0
@@ -194,7 +196,7 @@ class AudioPipeline:
 
         return False, ""
 
-    def listen_command(self, timeout: float = 5.0, phrase_time_limit: float = 10.0) -> str:
+    def listen_command(self, timeout: float = 3.5, phrase_time_limit: float = 4.5) -> str:
         time.sleep(0.02)
         perf_tracker.start_stage("Captura Micrófono")
         try:
