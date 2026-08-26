@@ -143,11 +143,19 @@ Tu tono es directo, con un sarcasmo seco y ocasional — nunca payaso, nunca sum
             try:
                 from floating_ui import ui_bridge
                 ui_bridge.emit_state("analizando")
+                ui_bridge.emit_action("Inspeccionando tu pantalla...")
                 shot_data = pc_controller.capture_screen()
                 if shot_data.get("status") == "success":
                     screen_bytes = shot_data.get("image_bytes")
             except Exception as e:
                 logger.debug(f"Error capturando pantalla: {e}")
+        else:
+            try:
+                from floating_ui import ui_bridge
+                ui_bridge.emit_state("thinking")
+                ui_bridge.emit_action("Pensando respuesta...")
+            except Exception:
+                pass
 
         relevant_tools = [] if is_screen_query else self._filter_tools_by_intent(user_text)
 

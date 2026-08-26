@@ -21,6 +21,7 @@ def tool_set_pc_volume(level_percent: int) -> Dict[str, Any]:
     """Ajusta el volumen del sistema en la laptop Windows (0 a 100)."""
     try:
         ui_bridge.emit_state("trabajando")
+        ui_bridge.emit_action(f"Ajustando volumen al {level_percent}%...")
     except Exception:
         pass
     return pc_controller.set_volume(level_percent)
@@ -29,6 +30,8 @@ def tool_control_pc_media(action: str) -> Dict[str, Any]:
     """Controla la reproducción multimedia en la Laptop ('play_pause', 'next', 'previous', 'mute')."""
     try:
         ui_bridge.emit_state("trabajando")
+        act_map = {"play_pause": "Pausando/Reanudando", "next": "Siguiente canción", "previous": "Canción anterior", "mute": "Silenciando"}
+        ui_bridge.emit_action(f"{act_map.get(action, 'Control multimedia')}...")
     except Exception:
         pass
     return pc_controller.control_media(action)
@@ -36,6 +39,7 @@ def tool_control_pc_media(action: str) -> Dict[str, Any]:
 def tool_play_music(query: str, platform: Optional[str] = "spotify") -> Dict[str, Any]:
     """Busca y reproduce una canción, artista o playlist en Spotify o YouTube en la Laptop."""
     try:
+        ui_bridge.emit_action(f"Buscando '{query[:18]}' en {platform.capitalize()}...")
         ui_bridge.emit_music(True, query, f"Reproduciendo en {platform.capitalize()}")
     except Exception:
         pass
@@ -45,6 +49,7 @@ def tool_open_website(url_or_query: str) -> Dict[str, Any]:
     """Abre un sitio web o busca en el navegador de la Laptop."""
     try:
         ui_bridge.emit_state("trabajando")
+        ui_bridge.emit_action(f"Abriendo {url_or_query[:20]}...")
     except Exception:
         pass
     return pc_controller.open_website(url_or_query)
@@ -53,6 +58,7 @@ def tool_open_pc_app(app_name: str) -> Dict[str, Any]:
     """Abre un programa en Windows (ej: 'calculadora', 'bloc de notas', 'vs code', 'chrome', 'spotify')."""
     try:
         ui_bridge.emit_state("trabajando")
+        ui_bridge.emit_action(f"Abriendo {app_name.capitalize()} en PC...")
     except Exception:
         pass
     return pc_controller.open_app(app_name)
@@ -61,6 +67,7 @@ def tool_press_hotkey(keys_str: str) -> Dict[str, Any]:
     """Presiona un atajo de teclado en Windows (ej: 'win+d', 'alt+tab', 'ctrl+w')."""
     try:
         ui_bridge.emit_state("trabajando")
+        ui_bridge.emit_action(f"Atajo de teclado: {keys_str}...")
     except Exception:
         pass
     return pc_controller.press_hotkey(keys_str)
@@ -69,6 +76,7 @@ def tool_lock_pc() -> Dict[str, Any]:
     """Bloquea la sesión de la computadora Windows de inmediato."""
     try:
         ui_bridge.emit_state("trabajando")
+        ui_bridge.emit_action("Bloqueando sesión de Windows...")
     except Exception:
         pass
     return pc_controller.lock_workstation()
@@ -77,6 +85,7 @@ def tool_run_pc_command(command: str) -> Dict[str, Any]:
     """Ejecuta un comando de consola PowerShell/CMD en Windows."""
     try:
         ui_bridge.emit_state("trabajando")
+        ui_bridge.emit_action("Ejecutando comando en Windows...")
     except Exception:
         pass
     return pc_controller.run_command(command)
@@ -85,6 +94,7 @@ def tool_scan_network_devices() -> Dict[str, Any]:
     """Escanea la red WiFi local en menos de 1.2 segundos y lista todos los dispositivos conectados."""
     try:
         ui_bridge.emit_state("analizando")
+        ui_bridge.emit_action("Escaneando red WiFi...")
     except Exception:
         pass
     try:
@@ -97,6 +107,8 @@ def tool_control_smart_tv(command: str, app_name: Optional[str] = None) -> Dict[
     """Controla la Smart TV Roku conectada al WiFi (power, volume_up, volume_down, play_pause, launch_app con 'netflix'/'youtube')."""
     try:
         ui_bridge.emit_state("trabajando")
+        target_name = app_name if app_name else command
+        ui_bridge.emit_action(f"Enviando '{target_name}' a Smart TV...")
     except Exception:
         pass
     try:
@@ -108,6 +120,7 @@ def tool_search_web_live(query: str) -> Dict[str, Any]:
     """Busca en internet en tiempo real para obtener información actualizada, noticias, clima o datos."""
     try:
         ui_bridge.emit_state("analizando")
+        ui_bridge.emit_action(f"Buscando en web: '{query[:16]}'...")
     except Exception:
         pass
     try:
@@ -132,6 +145,7 @@ def tool_save_personal_fact(category: str, key_topic: str, fact_text: str) -> Di
     """Guarda un hecho permanente sobre Andriy en la memoria local."""
     try:
         ui_bridge.emit_state("trabajando")
+        ui_bridge.emit_action(f"Memorizando: {key_topic[:18]}...")
     except Exception:
         pass
     try:
@@ -144,6 +158,7 @@ def tool_find_my_phone() -> Dict[str, Any]:
     """Hace sonar una alarma fuerte en el celular Android para encontrarlo."""
     try:
         ui_bridge.emit_state("trabajando")
+        ui_bridge.emit_action("Haciendo sonar tu celular...")
     except Exception:
         pass
     if _ws_client_ref and _ws_client_ref.ws:
@@ -157,6 +172,7 @@ def tool_make_phone_call(contact_name: str) -> Dict[str, Any]:
     """Inicia una llamada telefónica desde el celular Android a un contacto."""
     try:
         ui_bridge.emit_state("trabajando")
+        ui_bridge.emit_action(f"Llamando a {contact_name}...")
     except Exception:
         pass
     if _ws_client_ref and _ws_client_ref.ws:
@@ -170,6 +186,7 @@ def tool_send_whatsapp(contact_name: str, message: str) -> Dict[str, Any]:
     """Envía un mensaje de WhatsApp desde el celular Android."""
     try:
         ui_bridge.emit_state("trabajando")
+        ui_bridge.emit_action(f"WhatsApp para {contact_name}...")
     except Exception:
         pass
     if _ws_client_ref and _ws_client_ref.ws:

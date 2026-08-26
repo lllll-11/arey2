@@ -93,6 +93,9 @@ class UIBridge(QObject):
     def emit_subtitle(self, speaker: str, text: str):
         self.subtitle_changed.emit(speaker, text)
 
+    def emit_action(self, action_text: str):
+        self.subtitle_changed.emit("action", action_text)
+
     def emit_devices(self, phone_online: bool, phone_batt: int, tv_online: bool = True):
         self.device_status_changed.emit({
             "phone_online": phone_online,
@@ -311,15 +314,15 @@ class FloatingLiquidOrb(QWidget):
         # 5. PÍLDORA FLOTANTE DE SUBTÍTULOS / ESTADO (GLASSMORPHIC ULTRA-LIGERA)
         pill_y = 230
         pill_height = 30
-        pill_width = 220
+        pill_width = 250
         pill_x = int(center_x - pill_width / 2.0)
 
         pill_path = QPainterPath()
         pill_path.addRoundedRect(float(pill_x), float(pill_y), float(pill_width), float(pill_height), 15.0, 15.0)
 
         # Fondo glass negro translúcido
-        painter.setBrush(QBrush(QColor(10, 12, 18, 170)))
-        painter.setPen(QPen(QColor(255, 255, 255, 30), 1))
+        painter.setBrush(QBrush(QColor(10, 12, 18, 185)))
+        painter.setPen(QPen(QColor(255, 255, 255, 35), 1))
         painter.drawPath(pill_path)
 
         # Punto de modo
@@ -329,13 +332,13 @@ class FloatingLiquidOrb(QWidget):
         painter.drawEllipse(QPointF(pill_x + 14, pill_y + 15), 3.5, 3.5)
 
         # Texto de estado
-        painter.setPen(QPen(QColor(240, 240, 245, 230)))
+        painter.setPen(QPen(QColor(240, 240, 245, 235)))
         font = QFont("Outfit", 9, QFont.Weight.DemiBold)
         painter.setFont(font)
 
         display_text = self.subtitle_text
-        if len(display_text) > 28:
-            display_text = display_text[:26] + "..."
+        if len(display_text) > 34:
+            display_text = display_text[:32] + "..."
 
         painter.drawText(
             pill_x + 24, pill_y, pill_width - 32, pill_height,
