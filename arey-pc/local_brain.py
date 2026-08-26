@@ -207,6 +207,9 @@ Tu tono es directo, con un sarcasmo seco y ocasional — nunca payaso, nunca sum
                 # Guardar respuesta de Arey en la memoria local
                 await local_memory.add_message(role="assistant", content=final_text, device_source="pc")
 
+                # Auto-aprendizaje autónomo en segundo plano (sin retrasar la voz)
+                asyncio.create_task(self._background_extract_learning(user_text))
+
                 return final_text
             except Exception as e:
                 logger.warning(f"Modelo local '{model_name}' falló: {e}. Probando respaldo...")
@@ -215,5 +218,44 @@ Tu tono es directo, con un sarcasmo seco y ocasional — nunca payaso, nunca sum
 
         logger.error(f"Error procesando con Gemini: {last_error}")
         return "Se me cayó la conexión con el modelo un segundo, ¿me lo repites?"
+
+    async def _background_extract_learning(self, user_text: str):
+        """
+        Analiza silenciosamente en segundo plano si Andriy mencionó algún dato personal,
+        preferencia, hábito o contacto para guardarlo en la memoria permanente SQLite.
+        """
+        if not user_text or len(user_text.strip()) < 10:
+            return
+
+        # Descartar preguntas casuales obvias sin datos personales
+        t_low = user_text.lower()
+        if any(w in t_low for w in ["que hora es", "qué hora es", "sube el volumen", "baja el volumen", "pausa", "play"]):
+            return
+
+        prompt = f"""Analiza este mensaje de Andriy: "{user_text}".
+Si contiene un dato personal, gusto, contacto, preferencia, rutina o hábito permanente sobre él que deba recordarse a futuro, extráelo en formato JSON:
+{{"has_fact": true, "category": "preferencias/contactos/habitos/personal", "key_topic": "tema_corto", "fact_text": "descripcion_clara"}}
+Si es solo una pregunta casual, un comando de hardware o no hay nada permanente que recordar, responde:
+{{"has_fact": false}}
+Responde ÚNICAMENTE con el bloque JSON sin explicaciones."""
+
+        try:
+            r = await self.client.aio.models.generate_content(
+                model="gemini-3.1-flash-lite",
+                contents=prompt
+            )
+            raw = r.text.strip() if r and r.text else ""
+            if "{" in raw and "}" in raw:
+                json_str = raw[raw.find("{"):raw.rfind("}")+1]
+                data = json.loads(json_str)
+                if data.get("has_fact"):
+                    cat = data.get("category", "personal")
+                    key = data.get("key_topic", "general")
+                    fact = data.get("fact_text", "")
+                    if fact:
+                        await local_memory.save_fact(cat, key, fact)
+                        logger.info(f"💡 [AUTO-APRENDIZAJE] Hecho aprendido sobre Andriy: [{cat}] {key} -> {fact}")
+        except Exception as e:
+            logger.debug(f"Auto-aprendizaje background error: {e}")
 
 local_brain = LocalAreyBrain()
