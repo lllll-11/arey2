@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Asistente Virtual Minimalista - Estilo Livi DJ</title>
+  
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Outfit:wght@500;600;700&display=swap" rel="stylesheet">
+  
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: #07080c;
+      background-image: 
+        radial-gradient(at 50% 30%, rgba(20, 20, 35, 0.9) 0px, transparent 100%),
+        radial-gradient(at 50% 80%, rgba(10, 10, 18, 0.95) 0px, transparent 100%);
+      overflow: hidden;
+    }
+
+    .font-outfit {
+      font-family: 'Outfit', sans-serif;
+    }
+
+    /* Glass Container with Smooth Height Transition for Music Player expansion */
+    .glass-card {
+      background: rgba(14, 15, 20, 0.65);
+      backdrop-filter: blur(36px);
+      -webkit-backdrop-filter: blur(36px);
+      border: 1px solid rgba(255, 255, 255, 0.09);
+      box-shadow: 
+        0 30px 60px -15px rgba(0, 0, 0, 0.85),
+        inset 0 1px 1px 0 rgba(255, 255, 255, 0.12);
+      transition: height 0.5s cubic-bezier(0.16, 1, 0.3, 1), transform 0.3s ease;
+    }
+
+    /* Floating Window Animation */
+    @keyframes floatWindow {
+      0%, 100% { transform: translateY(0px); }
+      50% { transform: translateY(-7px); }
+    }
+
+    .animate-float {
+      animation: floatWindow 5.5s ease-in-out infinite;
+    }
+
+    /* Glowing Aura Background */
+    .glow-aura {
+      transition: background 1.2s cubic-bezier(0.4, 0, 0.2, 1), opacity 1s ease, transform 1s ease;
+      filter: blur(55px);
+    }
+
+    /* Dynamic Status Toast */
+    .status-toast {
+      transition: opacity 0.5s cubic-bezier(0.4, 0, 0.2, 1), transform 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .status-toast.hidden-state {
+      opacity: 0;
+      transform: translateY(6px) scale(0.95);
+      pointer-events: none;
+    }
+    .status-toast.visible-state {
+      opacity: 1;
+      transform: translateY(0px) scale(1);
+    }
+
+    /* Expandable Music Player Animations */
+    .music-player-panel {
+      transition: max-height 0.6s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.4s ease, transform 0.4s ease;
+      max-height: 0;
+      opacity: 0;
+      overflow: hidden;
+      transform: translateY(10px) scale(0.96);
+    }
+
+    .music-player-panel.active {
+      max-height: 140px;
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+
+    /* Rotating Album Disc Animation */
+    @keyframes spinDisc {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+
+    .spin-disc {
+      animation: spinDisc 8s linear infinite;
+    }
+    .spin-disc.paused {
+      animation-play-state: paused;
+    }
+
+    /* Animated Audio Equalizer Bars */
+    .eq-bar {
+      animation: eqBounce 1.2s ease-in-out infinite alternate;
+      transform-origin: bottom;
+    }
+    .eq-bar:nth-child(1) { animation-delay: 0.1s; }
+    .eq-bar:nth-child(2) { animation-delay: 0.3s; }
+    .eq-bar:nth-child(3) { animation-delay: 0.5s; }
+    .eq-bar:nth-child(4) { animation-delay: 0.2s; }
+
+    @keyframes eqBounce {
+      0% { transform: scaleY(0.25); }
+      100% { transform: scaleY(1); }
+    }
+
+    .eq-paused .eq-bar {
+      animation-play-state: paused;
+      transform: scaleY(0.2);
+    }
+  </style>
+</head>
+<body class="h-screen w-screen flex items-center justify-center select-none text-white relative">
+
+  <!-- Ambient Light Background Reflection -->
+  <div class="absolute inset-0 pointer-events-none flex items-center justify-center opacity-30">
+    <div id="ambientBg" class="w-[550px] h-[550px] rounded-full blur-[140px] transition-all duration-1000 bg-cyan-500/30"></div>
+  </div>
+
+  <!-- Main Floating Pure Orb Widget -->
+  <div id="mainWidget" class="glass-card relative w-[310px] rounded-[44px] p-6 flex flex-col items-center justify-between animate-float">
+    
+    <!-- Top Minimalist Header with Music Toggle & Status -->
+    <div class="w-full flex items-center justify-between text-zinc-400 text-xs font-medium px-2 pt-1">
+      <div class="flex items-center gap-2">
+        <span id="statusDot" class="w-2 h-2 rounded-full bg-cyan-400 transition-colors duration-500 animate-pulse"></span>
+        <span class="tracking-widest uppercase text-[9px] font-semibold text-zinc-400/80">Livi Assistant</span>
+      </div>
+
+      <!-- Quick Toggle Music Mode Button -->
+      <button onclick="toggleMusicMode()" class="flex items-center gap-1.5 text-[9px] tracking-wider font-semibold uppercase px-2 py-1 rounded-full bg-white/5 hover:bg-white/10 text-zinc-400 hover:text-emerald-400 transition-all border border-white/5" title="Reproducir Música">
+        <svg class="w-3 h-3 text-emerald-400" fill="currentColor" viewBox="0 0 24 24">
+          <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/>
+        </svg>
+        <span id="musicBtnLabel">DJ Livi</span>
+      </button>
+    </div>
+
+    <!-- Center Fluid Canvas Orb & Dynamic Aura -->
+    <div class="relative w-[210px] h-[210px] my-2 flex items-center justify-center cursor-pointer group" onclick="cycleNextMode()" title="Haz clic para interactuar / cambiar modo">
+      <!-- Dynamic Ambient Aura Glow behind Orb -->
+      <div id="orbGlow" class="glow-aura absolute inset-1 rounded-full opacity-75 bg-cyan-500"></div>
+
+      <!-- Canvas for Liquid Visual Physics -->
+      <canvas id="orbCanvas" width="240" height="240" class="relative z-10 w-[210px] h-[210px] drop-shadow-[0_16px_35px_rgba(0,0,0,0.65)] transition-transform duration-300 group-hover:scale-[1.04] group-active:scale-[0.97]"></canvas>
+    </div>
+
+    <!-- Dynamic Minimalist Status Toast -->
+    <div id="statusToast" class="status-toast visible-state flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/5 border border-white/10 backdrop-blur-md mb-2">
+      <span id="modeIcon" class="w-1.5 h-1.5 rounded-full bg-cyan-400"></span>
+      <span id="statusTitle" class="font-outfit text-xs font-semibold tracking-wide text-white transition-all duration-300">
+        Escuchando...
+      </span>
+    </div>
+
+    <!-- Minimalist Expandable Music Player Panel -->
+    <div id="musicPlayerPanel" class="music-player-panel w-full">
+      <div class="w-full bg-white/[0.04] border border-white/10 rounded-2xl p-3 flex flex-col gap-2.5 backdrop-blur-md">
+        
+        <!-- Track Info & Controls -->
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2.5">
+            <!-- Vinyl / Album Cover Art -->
+            <div class="relative w-10 h-10 rounded-full overflow-hidden border border-white/20 shadow-md">
+              <div id="albumDisc" class="spin-disc w-full h-full bg-gradient-to-br from-emerald-400 via-teal-600 to-indigo-900 flex items-center justify-center">
+                <div class="w-3 h-3 bg-zinc-950 rounded-full border border-white/40"></div>
+              </div>
+            </div>
+
+            <!-- Song & Artist Details -->
+            <div class="flex flex-col">
+              <span class="font-outfit text-xs font-bold text-white tracking-wide truncate max-w-[120px]">
+                Midnight Vibe Mix
+              </span>
+              <span class="text-[10px] text-emerald-400 font-medium tracking-wider flex items-center gap-1">
+                DJ Livi Live • Spotify
+              </span>
+            </div>
+          </div>
+
+          <!-- Animated Live Equalizer Bars -->
+          <div id="eqContainer" class="flex items-end gap-0.5 h-4 px-1">
+            <span class="eq-bar w-0.5 h-4 bg-emerald-400 rounded-full"></span>
+            <span class="eq-bar w-0.5 h-4 bg-emerald-400 rounded-full"></span>
+            <span class="eq-bar w-0.5 h-4 bg-emerald-400 rounded-full"></span>
+            <span class="eq-bar w-0.5 h-4 bg-emerald-400 rounded-full"></span>
+          </div>
+        </div>
+
+        <!-- Progress Bar -->
+        <div class="w-full flex items-center gap-2">
+          <span class="text-[9px] text-zinc-400 font-mono">1:24</span>
+          <div class="flex-1 h-1 bg-white/10 rounded-full overflow-hidden cursor-pointer" onclick="scrubMusic(event)">
+            <div id="progressBar" class="h-full bg-gradient-to-r from-emerald-400 to-teal-300 w-[42%] transition-all duration-300"></div>
+          </div>
+          <span class="text-[9px] text-zinc-400 font-mono">3:45</span>
+        </div>
+
+        <!-- Mini Playback Control Buttons -->
+        <div class="flex items-center justify-center gap-4 pt-0.5 text-zinc-300">
+          <button onclick="prevTrack()" class="hover:text-white transition-colors" title="Anterior">
+            <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg>
+          </button>
+          
+          <button onclick="togglePlayPause()" class="w-7 h-7 rounded-full bg-emerald-500 text-zinc-950 flex items-center justify-center hover:scale-105 active:scale-95 transition-all shadow-lg shadow-emerald-500/20" title="Play/Pausa">
+            <svg id="playIcon" class="w-4 h-4 hidden" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+            <svg id="pauseIcon" class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+          </button>
+
+          <button onclick="nextTrack()" class="hover:text-white transition-colors" title="Siguiente">
+            <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg>
+          </button>
+        </div>
+
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    // --- Mode Configurations & Dynamic Color Palettes ---
+    const MODES = {
+      escuchando: {
+        title: "Escuchando...",
+        dotColor: "bg-cyan-400",
+        glowClass: "bg-cyan-500",
+        bgClass: "bg-cyan-500/30",
+        colors: ['#00f2fe', '#4facfe', '#0066ff', '#00c6ff'],
+        speed: 0.05,
+        reactivity: 0.38,
+        baseRadius: 68,
+        freq1: 3, freq2: 5, freq3: 7
+      },
+      pensando: {
+        title: "Pensando...",
+        dotColor: "bg-purple-400",
+        glowClass: "bg-purple-600",
+        bgClass: "bg-purple-600/30",
+        colors: ['#a855f7', '#7c3aed', '#6366f1', '#c084fc'],
+        speed: 0.09,
+        reactivity: 0.18,
+        baseRadius: 64,
+        freq1: 4, freq2: 6, freq3: 9
+      },
+      trabajando: {
+        title: "Trabajando...",
+        dotColor: "bg-amber-400",
+        glowClass: "bg-amber-500",
+        bgClass: "bg-amber-500/30",
+        colors: ['#f59e0b', '#d97706', '#f97316', '#fbbf24'],
+        speed: 0.04,
+        reactivity: 0.14,
+        baseRadius: 70,
+        freq1: 2, freq2: 4, freq3: 6
+      },
+      analizando: {
+        title: "Analizando...",
+        dotColor: "bg-emerald-400",
+        glowClass: "bg-emerald-500",
+        bgClass: "bg-emerald-500/30",
+        colors: ['#10b981', '#059669', '#06b6d4', '#34d399'],
+        speed: 0.07,
+        reactivity: 0.25,
+        baseRadius: 65,
+        freq1: 5, freq2: 8, freq3: 12
+      },
+      hablando: {
+        title: "Hablando...",
+        dotColor: "bg-rose-400",
+        glowClass: "bg-rose-500",
+        bgClass: "bg-rose-500/30",
+        colors: ['#ec4899', '#f43f5e', '#fb7185', '#e11d48'],
+        speed: 0.065,
+        reactivity: 0.5,
+        baseRadius: 72,
+        freq1: 3, freq2: 5, freq3: 8
+      },
+      musica: {
+        title: "Reproduciendo Música...",
+        dotColor: "bg-emerald-400",
+        glowClass: "bg-emerald-500",
+        bgClass: "bg-emerald-500/30",
+        colors: ['#1ed760', '#1db954', '#00d2ff', '#10b981'],
+        speed: 0.08,
+        reactivity: 0.45,
+        baseRadius: 71,
+        freq1: 4, freq2: 7, freq3: 10
+      }
+    };
+
+    let currentModeKey = 'escuchando';
+    let interpolatedColors = [...MODES.escuchando.colors];
+    let isPlaying = true;
+
+    // Canvas Context Setup
+    const canvas = document.getElementById('orbCanvas');
+    const ctx = canvas.getContext('2d');
+    const width = canvas.width;
+    const height = canvas.height;
+    const centerX = width / 2;
+    const centerY = height / 2;
+
+    let time = 0;
+    let toastTimeout = null;
+
+    function renderOrb() {
+      ctx.clearRect(0, 0, width, height);
+
+      const mode = MODES[currentModeKey];
+      time += mode.speed;
+
+      // Smooth color interpolation for seamless aura and orb color shifts
+      for (let c = 0; c < 4; c++) {
+        interpolatedColors[c] = blendHexColors(interpolatedColors[c], mode.colors[c], 0.08);
+      }
+
+      // Dynamic waveform reactivity
+      let dynamicReactivity = Math.sin(time * 6) * mode.reactivity + (mode.reactivity * 0.5);
+      const baseRadius = mode.baseRadius + (dynamicReactivity * 12);
+      const points = 130;
+      
+      // Radial Liquid Gradient
+      const gradient = ctx.createRadialGradient(
+        centerX + Math.sin(time) * 16, 
+        centerY + Math.cos(time) * 16, 
+        8, 
+        centerX, 
+        centerY, 
+        baseRadius + 30
+      );
+
+      gradient.addColorStop(0, interpolatedColors[0]);
+      gradient.addColorStop(0.35, interpolatedColors[1]);
+      gradient.addColorStop(0.7, interpolatedColors[2]);
+      gradient.addColorStop(1, interpolatedColors[3]);
+
+      ctx.save();
+      ctx.beginPath();
+
+      // Draw organic fluid perimeter vertices
+      for (let i = 0; i <= points; i++) {
+        const angle = (i / points) * Math.PI * 2;
+
+        const wave1 = Math.sin(angle * mode.freq1 + time * 2) * (7 + dynamicReactivity * 16);
+        const wave2 = Math.cos(angle * wave2Freq(mode) - time * 1.5) * (5 + dynamicReactivity * 12);
+        const wave3 = Math.sin(angle * mode.freq3 + time * 3) * 3;
+
+        const r = baseRadius + wave1 + wave2 + wave3;
+
+        const x = centerX + Math.cos(angle) * r;
+        const y = centerY + Math.sin(angle) * r;
+
+        if (i === 0) {
+          ctx.moveTo(x, y);
+        } else {
+          ctx.lineTo(x, y);
+        }
+      }
+
+      ctx.closePath();
+      ctx.fillStyle = gradient;
+      ctx.fill();
+
+      // Inner 3D Specular Highlight Ring
+      const innerGlow = ctx.createRadialGradient(
+        centerX - 14, centerY - 22, 4,
+        centerX, centerY, baseRadius
+      );
+      innerGlow.addColorStop(0, 'rgba(255, 255, 255, 0.65)');
+      innerGlow.addColorStop(0.35, 'rgba(255, 255, 255, 0.14)');
+      innerGlow.addColorStop(1, 'rgba(255, 255, 255, 0)');
+
+      ctx.fillStyle = innerGlow;
+      ctx.fill();
+
+      // Ambient Floating Energy Particles
+      for (let p = 0; p < 5; p++) {
+        const pAngle = time * 0.7 + (p * Math.PI / 2.5);
+        const pDist = baseRadius + 14 + Math.sin(time * 2 + p) * 8;
+        const px = centerX + Math.cos(pAngle) * pDist;
+        const py = centerY + Math.sin(pAngle) * pDist;
+        
+        ctx.beginPath();
+        ctx.arc(px, py, 1.8 + Math.sin(time + p) * 1, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+        ctx.fill();
+      }
+
+      ctx.restore();
+
+      requestAnimationFrame(renderOrb);
+    }
+
+    function wave2Freq(mode) {
+      return mode.freq2 || 5;
+    }
+
+    function setMode(modeKey) {
+      if (!MODES[modeKey]) return;
+      currentModeKey = modeKey;
+      const mode = MODES[modeKey];
+
+      // Update Text & Indicators
+      const titleEl = document.getElementById('statusTitle');
+      titleEl.textContent = mode.title;
+
+      const modeIcon = document.getElementById('modeIcon');
+      modeIcon.className = `w-1.5 h-1.5 rounded-full ${mode.dotColor}`;
+
+      const dot = document.getElementById('statusDot');
+      dot.className = `w-2 h-2 rounded-full ${mode.dotColor} transition-colors duration-500 animate-pulse`;
+
+      // Update Glow Backdrop Aura & Ambient Background
+      const glow = document.getElementById('orbGlow');
+      glow.className = `glow-aura absolute inset-1 rounded-full opacity-75 ${mode.glowClass}`;
+
+      const bg = document.getElementById('ambientBg');
+      bg.className = `w-[550px] h-[550px] rounded-full blur-[140px] transition-all duration-1000 ${mode.bgClass}`;
+
+      // Handle Expandable Music Player Visibility
+      const musicPanel = document.getElementById('musicPlayerPanel');
+      if (modeKey === 'musica') {
+        musicPanel.classList.add('active');
+      } else {
+        musicPanel.classList.remove('active');
+      }
+
+      // Reveal status toast smoothly on mode change
+      const toast = document.getElementById('statusToast');
+      toast.classList.remove('hidden-state');
+      toast.classList.add('visible-state');
+
+      // Auto-hide toast gently after 3.5 seconds unless in music mode
+      clearTimeout(toastTimeout);
+      if (modeKey !== 'musica') {
+        toastTimeout = setTimeout(() => {
+          toast.classList.remove('visible-state');
+          toast.classList.add('hidden-state');
+        }, 3500);
+      }
+    }
+
+    // Toggle Music mode directly from top button
+    function toggleMusicMode() {
+      if (currentModeKey === 'musica') {
+        setMode('escuchando');
+      } else {
+        setMode('musica');
+      }
+    }
+
+    // Cycle through modes when tapping the liquid orb
+    function cycleNextMode() {
+      const keys = Object.keys(MODES);
+      const currentIndex = keys.indexOf(currentModeKey);
+      const nextIndex = (currentIndex + 1) % keys.length;
+      setMode(keys[nextIndex]);
+    }
+
+    // Music Player Controls
+    function togglePlayPause() {
+      isPlaying = !isPlaying;
+      const albumDisc = document.getElementById('albumDisc');
+      const eqContainer = document.getElementById('eqContainer');
+      const playIcon = document.getElementById('playIcon');
+      const pauseIcon = document.getElementById('pauseIcon');
+
+      if (isPlaying) {
+        albumDisc.classList.remove('paused');
+        eqContainer.classList.remove('eq-paused');
+        playIcon.classList.add('hidden');
+        pauseIcon.classList.remove('hidden');
+      } else {
+        albumDisc.classList.add('paused');
+        eqContainer.classList.add('eq-paused');
+        playIcon.classList.remove('hidden');
+        pauseIcon.classList.add('hidden');
+      }
+    }
+
+    function scrubMusic(e) {
+      const rect = e.currentTarget.getBoundingClientRect();
+      const clickX = e.clientX - rect.left;
+      const percentage = (clickX / rect.width) * 100;
+      document.getElementById('progressBar').style.width = percentage + '%';
+    }
+
+    function nextTrack() {
+      setMode('musica');
+    }
+    function prevTrack() {
+      setMode('musica');
+    }
+
+    // Helper: Blend Hex Colors for Smooth Transitions
+    function blendHexColors(c1, c2, factor) {
+      const parseHex = (hex) => {
+        let h = hex.replace('#', '');
+        if (h.length === 3) h = h.split('').map(x => x + x).join('');
+        return [parseInt(h.slice(0,2), 16), parseInt(h.slice(2,4), 16), parseInt(h.slice(4,6), 16)];
+      };
+      const [r1, g1, b1] = parseHex(c1);
+      const [r2, g2, b2] = parseHex(c2);
+      
+      const r = Math.round(r1 + factor * (r2 - r1));
+      const g = Math.round(g1 + factor * (g2 - g1));
+      const b = Math.round(b1 + factor * (b2 - b1));
+
+      return '#' + [r, g, b].map(x => x.toString(16).padStart(2, '0')).join('');
+    }
+
+    // Initialize application on window load
+    window.onload = function() {
+      setMode('escuchando');
+      renderOrb();
+    };
+  </script>
+</body>
+</html>
