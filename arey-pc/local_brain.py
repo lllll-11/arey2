@@ -174,13 +174,13 @@ NO ESTÁS EN NINGÚN ENTORNO AISLADO NI SANDBOX: Tienes permisos completos de ej
 
         relevant_tools = [] if is_screen_query else self._filter_tools_by_intent(user_text)
 
-        # Modelos activos y comprobados en tu cuenta
+        # Modelos activos y comprobados con máxima velocidad y alta cuota
         candidate_models = [
+            "gemini-3.1-flash-lite",
+            "gemini-flash-lite-latest",
+            "gemini-3.1-flash-lite-preview",
             "gemini-3.6-flash",
-            "gemini-3.7-flash",
-            "gemini-flash-latest",
-            "gemini-3.5-flash-lite",
-            "gemini-3.1-flash-lite"
+            "gemini-3.7-flash"
         ]
 
         recent_history = await local_memory.get_recent_history(limit=4)
