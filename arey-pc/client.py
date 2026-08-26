@@ -15,6 +15,8 @@ from audio_pipeline import audio_pipeline
 from network_scanner import network_scanner
 from tv_controller import tv_controller
 from floating_ui import FloatingAreyCapsule, ui_bridge
+from local_fast_path import local_fast_path
+from performance_tracker import perf_tracker
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] AreyPC: %(message)s")
 logger = logging.getLogger("AreyPCClient")
@@ -194,9 +196,6 @@ class AreyPCClient:
             return {"status": "error", "message": "No se encontró ninguna Smart TV activa en la red WiFi."}
         else:
             return {"status": "error", "message": f"Acción '{action}' no soportada en PC."}
-
-from local_fast_path import local_fast_path
-from performance_tracker import perf_tracker
 
     async def _voice_loop(self):
         """
