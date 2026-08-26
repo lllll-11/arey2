@@ -125,12 +125,25 @@ class PCController:
             "discord": "start discord:",
             "word": "start winword",
             "excel": "start excel",
-            "whatsapp": "start whatsapp:"
+            "whatsapp": "start whatsapp:",
+            "descargas": os.path.expanduser("~/Downloads"),
+            "downloads": os.path.expanduser("~/Downloads"),
+            "documentos": os.path.expanduser("~/Documents"),
+            "documents": os.path.expanduser("~/Documents"),
+            "escritorio": os.path.expanduser("~/Desktop"),
+            "desktop": os.path.expanduser("~/Desktop"),
+            "imagenes": os.path.expanduser("~/Pictures"),
+            "fotos": os.path.expanduser("~/Pictures"),
+            "videos": os.path.expanduser("~/Videos"),
+            "arey": r"c:\Users\agwit\OneDrive\Escritorio\arey2"
         }
         
         target = app_map.get(app_name.lower().strip(), app_name)
         try:
-            subprocess.Popen(f"start {target}" if not target.startswith("start ") else target, shell=True)
+            if os.path.exists(target):
+                os.startfile(target)
+            else:
+                subprocess.Popen(f"start {target}" if not target.startswith("start ") else target, shell=True)
             return {"status": "success", "message": f"Abriendo '{app_name}' en la laptop."}
         except Exception as e:
             logger.error(f"Error abriendo aplicación '{app_name}': {e}")

@@ -1,4 +1,6 @@
+import os
 import re
+import subprocess
 import logging
 from typing import Optional, Tuple
 from pc_controller import pc_controller
@@ -9,7 +11,7 @@ logger = logging.getLogger("AreyFastPath")
 class LocalFastPath:
     """
     Enrutador determinista local de ultrabaja latencia (< 1ms).
-    Ejecuta comandos de hardware, volumen y control de Windows inmediatamente en la laptop.
+    Ejecuta comandos de hardware, volumen, apps y apertura de carpetas inmediatamente en la laptop.
     """
     def __init__(self):
         pass
@@ -118,7 +120,50 @@ class LocalFastPath:
             pc_controller.press_hotkey("alt+f4")
             return ("close_window", "Ventana cerrada.")
 
-        # ----------------- 4. ABRIR APLICACIONES COMUNES -----------------
+        # ----------------- 4. ABRIR CARPETAS Y DIRECTORIOS (0ms) -----------------
+        folder_aliases = {
+            "descargas": (os.path.expanduser("~/Downloads"), "Abriendo carpeta de Descargas."),
+            "downloads": (os.path.expanduser("~/Downloads"), "Abriendo carpeta de Descargas."),
+            "la carpeta de descargas": (os.path.expanduser("~/Downloads"), "Abriendo carpeta de Descargas."),
+            "la carpeta descargas": (os.path.expanduser("~/Downloads"), "Abriendo carpeta de Descargas."),
+            "documentos": (os.path.expanduser("~/Documents"), "Abriendo carpeta de Documentos."),
+            "documents": (os.path.expanduser("~/Documents"), "Abriendo carpeta de Documentos."),
+            "la carpeta documentos": (os.path.expanduser("~/Documents"), "Abriendo carpeta de Documentos."),
+            "la carpeta de documentos": (os.path.expanduser("~/Documents"), "Abriendo carpeta de Documentos."),
+            "escritorio": (os.path.expanduser("~/Desktop"), "Abriendo tu Escritorio."),
+            "el escritorio": (os.path.expanduser("~/Desktop"), "Abriendo tu Escritorio."),
+            "imagenes": (os.path.expanduser("~/Pictures"), "Abriendo carpeta de Imágenes."),
+            "fotos": (os.path.expanduser("~/Pictures"), "Abriendo carpeta de Fotos."),
+            "musica": (os.path.expanduser("~/Music"), "Abriendo carpeta de Música."),
+            "videos": (os.path.expanduser("~/Videos"), "Abriendo carpeta de Videos."),
+            "explorador": ("explorer.exe", "Abriendo Explorador de Archivos."),
+            "explorador de archivos": ("explorer.exe", "Abriendo Explorador de Archivos."),
+            "archivos": ("explorer.exe", "Abriendo Explorador de Archivos."),
+            "mis archivos": ("explorer.exe", "Abriendo Explorador de Archivos."),
+            "arey": (r"c:\Users\agwit\OneDrive\Escritorio\arey2", "Abriendo carpeta del proyecto Arey."),
+            "proyecto": (r"c:\Users\agwit\OneDrive\Escritorio\arey2", "Abriendo carpeta del proyecto Arey."),
+            "la carpeta arey": (r"c:\Users\agwit\OneDrive\Escritorio\arey2", "Abriendo carpeta del proyecto Arey."),
+            "la carpeta de arey": (r"c:\Users\agwit\OneDrive\Escritorio\arey2", "Abriendo carpeta del proyecto Arey."),
+            "disco c": ("C:\\", "Abriendo Disco Local C."),
+            "disco local": ("C:\\", "Abriendo Disco Local C.")
+        }
+
+        for trigger, (f_path, voice_reply) in folder_aliases.items():
+            if t in [f"abre {trigger}", f"abrir {trigger}", f"abre la carpeta {trigger}", f"abrir la carpeta {trigger}", f"abre carpeta {trigger}", f"abre la carpeta de {trigger}", trigger]:
+                try:
+                    ui_bridge.emit_action(f"Abriendo {trigger.capitalize()}...")
+                except Exception:
+                    pass
+                try:
+                    if f_path == "explorer.exe":
+                        subprocess.Popen("explorer.exe")
+                    else:
+                        os.startfile(f_path)
+                    return (f"open_folder_{trigger}", voice_reply)
+                except Exception as e:
+                    logger.debug(f"Error abriendo carpeta {f_path}: {e}")
+
+        # ----------------- 5. ABRIR APLICACIONES COMUNES -----------------
         apps_direct = {
             "calculadora": ("calc", "Abriendo calculadora."),
             "calc": ("calc", "Abriendo calculadora."),
