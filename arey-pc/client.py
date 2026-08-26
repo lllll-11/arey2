@@ -39,13 +39,10 @@ def optimize_windows_environment():
 
     try:
         import ctypes
-        # Evitar que Windows ponga en suspensión o throttling el hilo de audio
         ES_CONTINUOUS = 0x80000000
         ES_SYSTEM_REQUIRED = 0x00000001
         ES_AWAYMODE_REQUIRED = 0x00000040
         ctypes.windll.kernel32.SetThreadExecutionState(ES_CONTINUOUS | ES_SYSTEM_REQUIRED | ES_AWAYMODE_REQUIRED)
-
-        # Aumentar precisión del reloj de Windows a 1ms para 60 FPS ultra fluidos
         ctypes.windll.winmm.timeBeginPeriod(1)
         logger.info("⚡ Temporizador multimedia de Windows calibrado a 1ms (60 FPS fluidos).")
     except Exception as e:
@@ -54,9 +51,9 @@ def optimize_windows_environment():
 class AreyPCClient:
     """
     Cliente Autónomo Local de Laptop Arey 2.1:
-    - Conversación y Razonamiento 100% DIRECTO en la laptop con Gemini API y Whisper Small.
-    - Cero dependencia de Render para hablar, pensar o ejecutar acciones de PC y Smart TV.
-    - Puente WebSocket secundario solo para telemetría y control de celular Android.
+    - Modo de Escucha Continua Permanente (Always-On Open-Mic): Cero palabras de activación requeridas.
+    - Conversación y Razonamiento 100% DIRECTO en la laptop con Gemini API.
+    - Fast-Path < 10ms y respuestas de IA en sub-segundo (~350ms).
     """
     def __init__(self):
         optimize_windows_environment()
@@ -90,10 +87,9 @@ class AreyPCClient:
         """
         Bucle de conexión en segundo plano hacia Render (solo para enlace con Celular y telemetría).
         """
-        # Inicializar base de datos de memoria local
         await local_memory.init_db()
 
-        # Iniciar bucle de escucha de voz autónomo local
+        # Iniciar bucle de escucha continua autónomo local
         asyncio.create_task(self._voice_loop())
 
         # Conexión opcional a la nube para telemetría
@@ -130,7 +126,6 @@ class AreyPCClient:
                 data = json.loads(message_raw)
                 msg_type = data.get("type")
 
-                # Telemetría de celular
                 if msg_type == "devices_update":
                     devices = data.get("devices", {})
                     android = devices.get("android", {})
@@ -143,80 +138,68 @@ class AreyPCClient:
 
     async def _voice_loop(self):
         """
-        Bucle de voz 100% LOCAL:
-        Micrófono -> Whisper Small local -> Fast-Path o Local Gemini Brain -> Edge-TTS local.
-        Latencia total: ~400-600ms para IA, < 10ms para comandos de PC.
+        Bucle de voz CONTINUO (Siempre escuchando sin necesidad de decir 'Arey'):
+        Micrófono siempre activo -> Detección de voz -> Fast-Path o Gemini Brain -> Voz -> Vuelve a escuchar.
         """
         loop = asyncio.get_running_loop()
+        logger.info("🎙️ MODO DE ESCUCHA CONTINUA ACTIVO: Habla libremente cuando quieras.")
+
         while self.running:
-            if not self.is_processing_voice:
-                ui_bridge.emit_state("idle")
+            ui_bridge.emit_state("listening")
+            self.is_processing_voice = False
 
-            # 1. Comprobar si se activó por atajo o escuchar en vivo
-            is_manual = self.force_wake_event.is_set()
-            if is_manual:
-                self.force_wake_event.clear()
-                detected, direct_cmd = True, ""
-            else:
-                detected, direct_cmd = await loop.run_in_executor(executor, audio_pipeline.listen_for_wake_word)
+            # Captura continua del micrófono
+            user_text = await loop.run_in_executor(
+                executor, 
+                lambda: audio_pipeline.listen_command(timeout=3.0, phrase_time_limit=15.0)
+            )
 
-            if detected:
+            if user_text and user_text.strip():
+                clean = user_text.strip()
+                # Filtrar ruidos accidentales de 1 solo caracter
+                if len(clean) < 2:
+                    continue
+
+                # Si el usuario dijo 'arey qué hora es' o directamente 'qué hora es', limpiar prefijos de activación si los hay
+                for prefix in ["arey", "oye arey", "hey arey", "ari", "araí", "haré"]:
+                    if clean.lower().startswith(prefix):
+                        clean = clean[len(prefix):].strip(" ,.:;!?")
+                        break
+
+                if not clean:
+                    continue
+
                 perf_tracker.start_pipeline()
                 self.is_processing_voice = True
-                ui_bridge.emit_state("listening")
+                logger.info(f"🗣️ Andriy: '{clean}'")
+                ui_bridge.emit_subtitle("user", clean)
 
-                # 2. Si el usuario dijo la orden completa de un solo golpe, ejecutar de inmediato
-                if direct_cmd and len(direct_cmd.strip()) > 1:
-                    user_text = direct_cmd
-                    logger.info(f"⚡ COMANDO EN UN SOLO ALIENTO DETECTADO: '{user_text}'")
-                else:
-                    ui_bridge.emit_subtitle("status", "Escuchando... Habla ahora")
-                    audio_pipeline.play_instant_wake()
-                    user_text = await loop.run_in_executor(executor, audio_pipeline.listen_command)
+                # 1. FAST-PATH LOCAL (< 10ms para volumen, apps, media, atajos)
+                perf_tracker.start_stage("Fast-Path Router")
+                local_match = local_fast_path.try_execute_local(clean)
+                perf_tracker.end_stage("Fast-Path Router")
 
-                if user_text and user_text.strip():
-                    logger.info(f"🗣️ Andriy: '{user_text}'")
-                    ui_bridge.emit_subtitle("user", user_text)
-
-                    # 3. FAST-PATH LOCAL (< 10ms para volumen, apps, media, atajos)
-                    perf_tracker.start_stage("Fast-Path Router")
-                    local_match = local_fast_path.try_execute_local(user_text)
-                    perf_tracker.end_stage("Fast-Path Router")
-
-                    if local_match:
-                        action_name, reply_text = local_match
-                        logger.info(f"⚡ FAST-PATH EJECUTADO: '{action_name}'")
-                        ui_bridge.emit_state("speaking")
-                        ui_bridge.emit_subtitle("arey", reply_text)
-                        await audio_pipeline.speak(reply_text)
-                        ui_bridge.emit_state("idle")
-                        self.is_processing_voice = False
-                        perf_tracker.print_summary(user_text)
-                        continue
-
-                    # 4. CEREBRO LOCAL: Inferencia directa de Gemini API en la Laptop (~350ms)
-                    ui_bridge.emit_state("thinking")
-                    perf_tracker.start_stage("Gemini API Local")
-
-                    reply_text = await local_brain.process_user_message(user_text)
-                    perf_tracker.end_stage("Gemini API Local")
-
-                    logger.info(f"🧠 Arey: '{reply_text}'")
+                if local_match:
+                    action_name, reply_text = local_match
+                    logger.info(f"⚡ FAST-PATH EJECUTADO: '{action_name}'")
                     ui_bridge.emit_state("speaking")
                     ui_bridge.emit_subtitle("arey", reply_text)
                     await audio_pipeline.speak(reply_text)
+                    perf_tracker.print_summary(clean)
+                    continue
 
-                    ui_bridge.emit_state("idle")
-                    self.is_processing_voice = False
-                    perf_tracker.print_summary(user_text)
+                # 2. CEREBRO LOCAL: Inferencia directa de Gemini API (~350ms)
+                ui_bridge.emit_state("thinking")
+                perf_tracker.start_stage("Gemini API Local")
 
-                else:
-                    if audio_pipeline.should_suggest_recalibration():
-                        ui_bridge.emit_subtitle("status", "Tip: Calibra tu micrófono con 'entrenar_voz.bat'")
-                    else:
-                        ui_bridge.emit_subtitle("status", "No escuché ninguna orden. Di 'Arey'")
-                    ui_bridge.emit_state("idle")
-                    self.is_processing_voice = False
+                reply_text = await local_brain.process_user_message(clean)
+                perf_tracker.end_stage("Gemini API Local")
+
+                logger.info(f"🧠 Arey: '{reply_text}'")
+                ui_bridge.emit_state("speaking")
+                ui_bridge.emit_subtitle("arey", reply_text)
+                await audio_pipeline.speak(reply_text)
+                perf_tracker.print_summary(clean)
 
 if __name__ == "__main__":
     client = AreyPCClient()
@@ -226,7 +209,7 @@ if __name__ == "__main__":
     )
     client_thread.start()
 
-    logger.info("✨ Arey 2.1 iniciada en Modo Autónomo Local (Cero Latencia de Nube).")
+    logger.info("✨ Arey 2.1 iniciada en Modo de Escucha Continua (Sin palabra de activación).")
     start_floating_ui(
         on_wake_callback=client.force_wake,
         on_media_callback=lambda act: pc_controller.control_media(act)
