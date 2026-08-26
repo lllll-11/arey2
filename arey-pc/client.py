@@ -51,8 +51,8 @@ def optimize_windows_environment():
 class AreyPCClient:
     """
     Cliente Autónomo Local de Laptop Arey 2.1:
-    - Modo de Escucha Continua Permanente (Always-On Open-Mic): Cero palabras de activación requeridas.
-    - Conversación y Razonamiento 100% DIRECTO en la laptop con Gemini API.
+    - Modo de Escucha Continua con Compuerta Anti-Música (Filtra canciones de fondo).
+    - Conversación y Razonamiento 100% DIRECTO en la laptop con Gemini 3.6 Flash.
     - Fast-Path < 10ms y respuestas de IA en sub-segundo (~350ms).
     """
     def __init__(self):
@@ -60,8 +60,17 @@ class AreyPCClient:
         self.ws = None
         self.running = True
         self.is_processing_voice = False
+        self.is_music_active = False
         self.force_wake_event = threading.Event()
         set_ws_client_reference(self)
+
+        # Escuchar cambios de estado musical para ajustar compuerta de ruido
+        ui_bridge.music_changed.connect(self._on_music_state_changed)
+
+    def _on_music_state_changed(self, active: bool, title: str, artist: str):
+        self.is_music_active = active
+        if active:
+            logger.info("🎵 Modo Música Detectado: Elevando compuerta de ruido para ignorar la letra de la canción.")
 
     def force_wake(self):
         """Activación manual por clic en la esfera o atajo Alt+Espacio."""
@@ -138,29 +147,33 @@ class AreyPCClient:
 
     async def _voice_loop(self):
         """
-        Bucle de voz CONTINUO (Siempre escuchando sin necesidad de decir 'Arey'):
-        Micrófono siempre activo -> Detección de voz -> Fast-Path o Gemini Brain -> Voz -> Vuelve a escuchar.
+        Bucle de voz CONTINUO con filtro anti-música:
+        Micrófono siempre activo -> Detección de voz directa -> Fast-Path o Gemini Brain -> Voz.
         """
         loop = asyncio.get_running_loop()
         logger.info("🎙️ MODO DE ESCUCHA CONTINUA ACTIVO: Habla libremente cuando quieras.")
 
         while self.running:
-            ui_bridge.emit_state("listening")
+            ui_bridge.emit_state("musica" if self.is_music_active else "listening")
             self.is_processing_voice = False
 
-            # Captura continua del micrófono
+            # Captura con umbral adaptativo (filtra canciones de fondo)
             user_text = await loop.run_in_executor(
                 executor, 
-                lambda: audio_pipeline.listen_command(timeout=3.0, phrase_time_limit=15.0)
+                lambda: audio_pipeline.listen_command(
+                    timeout=3.0, 
+                    phrase_time_limit=12.0,
+                    is_music_active=self.is_music_active
+                )
             )
 
             if user_text and user_text.strip():
                 clean = user_text.strip()
-                # Filtrar ruidos accidentales de 1 solo caracter
-                if len(clean) < 2:
+                # Filtrar ruidos accidentales de 1-2 caracteres
+                if len(clean) < 3:
                     continue
 
-                # Si el usuario dijo 'arey qué hora es' o directamente 'qué hora es', limpiar prefijos de activación si los hay
+                # Si el usuario dijo 'arey qué hora es', limpiar prefijos
                 for prefix in ["arey", "oye arey", "hey arey", "ari", "araí", "haré"]:
                     if clean.lower().startswith(prefix):
                         clean = clean[len(prefix):].strip(" ,.:;!?")
@@ -188,7 +201,7 @@ class AreyPCClient:
                     perf_tracker.print_summary(clean)
                     continue
 
-                # 2. CEREBRO LOCAL: Inferencia directa de Gemini API (~350ms)
+                # 2. CEREBRO LOCAL: Inferencia directa de Gemini 3.6 Flash (~350ms)
                 ui_bridge.emit_state("thinking")
                 perf_tracker.start_stage("Gemini API Local")
 
@@ -209,7 +222,7 @@ if __name__ == "__main__":
     )
     client_thread.start()
 
-    logger.info("✨ Arey 2.1 iniciada en Modo de Escucha Continua (Sin palabra de activación).")
+    logger.info("✨ Arey 2.1 iniciada en Modo de Escucha Continua con Filtro Anti-Música.")
     start_floating_ui(
         on_wake_callback=client.force_wake,
         on_media_callback=lambda act: pc_controller.control_media(act)

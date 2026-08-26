@@ -1,6 +1,6 @@
 @echo off
 title Arey 2.1 - Agente de Laptop (Prioridad Alta)
-color 0b
+color a
 echo =======================================================
 echo          INICIANDO AGENTE DE LAPTOP - AREY 2.1
 echo       (Prioridad Alta & Rendimiento en Tiempo Real)
