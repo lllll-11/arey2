@@ -2,6 +2,7 @@ import os
 import json
 import logging
 import asyncio
+from datetime import datetime
 from typing import Dict, Any, List, Optional
 from google import genai
 from google.genai import types
@@ -21,10 +22,10 @@ logger = logging.getLogger("AreyLocalBrain")
 
 class LocalAreyBrain:
     """
-    Cerebro Local de Alta Velocidad para Laptop:
-    - Gemini Multimodal nativo para análisis instantáneo de pantalla (< 300 tokens).
-    - Inferencia directa sin pasar por Render.
-    - Modelos estables de alta cuota (gemini-2.5-flash / gemini-2.0-flash).
+    Cerebro Local de Alta Velocidad para Laptop con Gemini 3.6 Flash:
+    - Inferencia directa con modelos activos de Google GenAI (gemini-3.6-flash / gemini-3.7-flash / gemini-flash-latest).
+    - Visión multimodal de pantalla nativa (< 300 tokens).
+    - Inyección en tiempo real de hora local, fecha y contexto de sistema.
     """
     def __init__(self):
         self.client = None
@@ -51,9 +52,16 @@ class LocalAreyBrain:
             routines_list = [f"- Rutina '{r['routine_name']}' (Disparador: '{r['trigger_phrase']}')" for r in routines]
             routines_text = "\n=== RUTINAS PERSONALIZADAS ===\n" + "\n".join(routines_list)
 
+        now_str = datetime.now().strftime("%A %d de %B de %Y, %I:%M %p")
+
         system_prompt = f"""
 Eres **Arey**, la IA personal de **Andriy**.
 Tu tono es directo, con un sarcasmo seco y ocasional — nunca payaso, nunca sumiso. Hablas como un colega técnico de confianza, no como un asistente de call center.
+
+=== CONTEXTO TEMPORAL Y SISTEMA ===
+- Fecha y Hora Actual: {now_str}
+- Usuario: Andriy
+- Dispositivo: Laptop Windows 11 (Ejecución Local Nativa)
 
 ### 🎭 PERSONALIDAD Y REGLAS DE CONDUCTA:
 1. **Directa y Sin Relleno**:
@@ -73,10 +81,6 @@ Tu tono es directo, con un sarcasmo seco y ocasional — nunca payaso, nunca sum
 - Si pregunta por noticias, clima o datos en tiempo real ➔ USA DIRECTAMENTE `tool_search_web_live(query=...)`.
 - Si pide buscar su cel, llamar o mandar WhatsApp ➔ USA `tool_find_my_phone`, `tool_make_phone_call` o `tool_send_whatsapp`.
 - Si pide controlar la Smart TV (Netflix, YouTube, volumen, power) ➔ USA `tool_control_smart_tv`.
-
-=== ENTORNO DE TRABAJO ===
-- Usuario: Andriy
-- Dispositivo: Laptop Windows 11 (Ejecución Local Nativa)
 {facts_text}
 {routines_text}
 """
@@ -84,6 +88,10 @@ Tu tono es directo, con un sarcasmo seco y ocasional — nunca payaso, nunca sum
 
     def _filter_tools_by_intent(self, text: str) -> List[Any]:
         t = text.lower()
+
+        # Si solo pregunta la hora o saludo, no necesita herramientas pesadas
+        if any(w in t for w in ["que hora es", "qué hora es", "la hora", "que dia es", "qué día es", "fecha"]):
+            return []
 
         # Dominio 1: Red local, WiFi, Dispositivos y Smart TV
         if any(w in t for w in ["red", "wifi", "wi-fi", "dispositivo", "dispositivos", "ip", "router", "modem", "módem", "tele", "televisión", "television", "tv", "roku", "netflix", "prime video", "conectado", "conectados"]):
@@ -115,7 +123,7 @@ Tu tono es directo, con un sarcasmo seco y ocasional — nunca payaso, nunca sum
 
     async def process_user_message(self, user_text: str) -> str:
         """
-        Procesa el mensaje de voz directamente en la laptop y devuelve la respuesta hablada.
+        Procesa el mensaje de voz directamente en la laptop con Gemini 3.6 Flash.
         """
         if not self.client:
             self._init_gemini()
@@ -143,11 +151,12 @@ Tu tono es directo, con un sarcasmo seco y ocasional — nunca payaso, nunca sum
 
         relevant_tools = [] if is_screen_query else self._filter_tools_by_intent(user_text)
 
+        # Modelos activos y comprobados en tu cuenta
         candidate_models = [
-            "gemini-2.5-flash",
-            "gemini-2.0-flash",
-            "gemini-1.5-flash",
-            "gemini-2.5-flash-lite"
+            "gemini-3.6-flash",
+            "gemini-3.7-flash",
+            "gemini-flash-latest",
+            "gemini-3.5-flash-lite"
         ]
 
         recent_history = await local_memory.get_recent_history(limit=4)
@@ -159,7 +168,7 @@ Tu tono es directo, con un sarcasmo seco y ocasional — nunca payaso, nunca sum
                 parts=[types.Part.from_text(text=msg["content"])]
             ))
 
-        # Preparar partes del mensaje actual
+        # Preparar partes del mensaje
         message_parts = []
         if screen_bytes:
             message_parts.append(types.Part.from_bytes(data=screen_bytes, mime_type="image/jpeg"))
@@ -171,7 +180,7 @@ Tu tono es directo, con un sarcasmo seco y ocasional — nunca payaso, nunca sum
         for model_name in candidate_models:
             try:
                 if is_screen_query:
-                    # Inferencia multimodal directa (visión nativa de pantalla)
+                    # Inferencia multimodal directa
                     response = await self.client.aio.models.generate_content(
                         model=model_name,
                         contents=message_parts,
