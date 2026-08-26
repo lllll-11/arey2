@@ -179,14 +179,18 @@ class PCController:
     @staticmethod
     def run_command(command: str) -> Dict[str, Any]:
         """
-        Ejecuta un comando de consola en Windows de forma controlada.
+        Ejecuta un comando de consola en Windows de forma controlada sin bloqueos interactivos.
         """
         try:
+            cmd = command
+            if "winget" in cmd.lower() and "--accept" not in cmd.lower():
+                cmd = f"{cmd} --accept-source-agreements --accept-package-agreements"
+
             res = subprocess.run(
-                ["powershell", "-NoProfile", "-Command", command],
+                ["powershell", "-NoProfile", "-Command", cmd],
                 capture_output=True,
                 text=True,
-                timeout=15,
+                timeout=20,
                 creationflags=subprocess.CREATE_NO_WINDOW
             )
             output = res.stdout if res.stdout else res.stderr
