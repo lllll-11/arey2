@@ -54,14 +54,13 @@ def ensure_single_instance():
         import psutil
         current_pid = os.getpid()
         for p in psutil.process_iter(['pid', 'cmdline']):
-            if p.info['pid'] != current_pid:
-                cmd = ' '.join(p.info['cmdline'] or [])
-                if 'client.py' in cmd:
-                    try:
+            try:
+                if p.info['pid'] != current_pid:
+                    cmd = ' '.join(p.info['cmdline'] or [])
+                    if 'client.py' in cmd:
                         p.terminate()
-                        logger.info(f"🧹 Instancia anterior [PID {p.info['pid']}] cerrada automáticamente.")
-                    except Exception:
-                        pass
+            except Exception:
+                pass
     except Exception:
         pass
 
