@@ -11,8 +11,8 @@ import asyncio
 PROFILE_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "user_voice_profile.json"))
 
 DEFAULT_PROFILE = {
-    "calibrated_energy_threshold": 90,
-    "user_name": "Usuario",
+    "calibrated_energy_threshold": 80,
+    "user_name": "Andriy",
     "custom_wake_words": ["arey", "ari", "aree", "haré", "aré", "are", "aire", "oye arey", "hey arey", "hola arey", "oye ari"],
     "vocabulary_keywords": [
         "Arey", "Larissa", "Spotify", "Netflix", "YouTube", "WhatsApp", 
@@ -87,9 +87,8 @@ def run_training():
         profile["calibrated_energy_threshold"] = target_energy
         print(f"✅ Micrófono calibrado con éxito. Sensibilidad: {target_energy}")
 
-    # 2. Cargar modelo Whisper en memoria
-    print("\n[2/3] 🧠 Cargando modelo de reconocimiento...")
-    whisper = WhisperModel("tiny", device="cpu", compute_type="int8")
+    print("\n[2/3] 🧠 Cargando modelo de reconocimiento Whisper 'small'...")
+    whisper = WhisperModel("small", device="cpu", compute_type="int8")
 
     # 3. Pruebas de pronunciación guiadas
     phrases_to_train = [

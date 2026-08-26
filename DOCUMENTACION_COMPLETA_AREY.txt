@@ -1,321 +1,116 @@
 ================================================================================
-          DOCUMENTACION TECNICA Y MANUAL COMPLETO DE AREY 2.0
+          DOCUMENTACION TECNICA Y MANUAL COMPLETO DE AREY 2.1
           ECOSISTEMA DE ASISTENCIA INTELIGENTE MULTI-DISPOSITIVO
 ================================================================================
 
 FECHA: Agosto 2026
-AUTOR: Antigravity AI & lllll-11
-PROYECTO: Arey 2.0 (Asistente Personal de Inteligencia Artificial)
+USUARIO PRINCIPAL: Andriy
+PROYECTO: Arey 2.1 (Asistente Personal de Inteligencia Artificial)
 REPOSITORIO: https://github.com/lllll-11/arey2.git
 NUBE SERVIDOR: https://arey2-1.onrender.com (Render Cloud 24/7)
 
 ================================================================================
 1. QUE ES AREY Y CUAL ES SU PROPOSITO
 ================================================================================
-Arey no es un simple bot ni una aplicacion aislada; es un **ecosistema de 
-inteligencia artificial unificado** disenado para controlar y sincronizar 
-todos tus dispositivos fisicos bajo una sola mente compartida:
+Arey es la inteligencia artificial personal de Andriy. No es un bot corporativo 
+ni un asistente de call center con frases de relleno: habla directo al grano, 
+con humor seco y criterio tecnico real.
 
+Unifica todos tus dispositivos bajo una sola mente compartida:
   1. Tu Laptop / PC con Windows 11.
   2. Tu Telefono Celular Android (Huawei P30 Lite).
-  3. Tu Smart TV (JVC 32" con Roku OS conectada al WiFi).
-  4. Un Cerebro Central en la Nube activo 24/7 en Render.com.
-
-Cuando le hablas a Arey (por ejemplo, desde tu laptop), ella no solo puede 
-controlar la computadora, sino que puede activar la alarma de tu celular si no 
-lo encuentras, llamar a un contacto, encender la linterna, abrir una app en tu 
-telefono, poner musica en Spotify o YouTube, o encender y poner Netflix en tu 
-Smart TV.
-
+  3. Tu Smart TV (JVC 32" con Roku OS en 192.168.1.5 conectada al WiFi).
+  4. Un Cerebro Central en la Nube activo 24/7 en Render.com con ping externo.
 
 ================================================================================
-2. ARQUITECTURA GENERAL DEL SISTEMA (COMO SE CONECTA TODO)
+2. ARQUITECTURA GENERAL OPTIMIZADA (AREY 2.1)
 ================================================================================
 
-                  +-----------------------------------+
-                  |      CEREBRO CENTRAL EN NUBE      |
-                  |     (arey-server en Render.com)   |
-                  |                                   |
-                  |  - FastAPI + WebSockets Broker    |
-                  |  - Google Gemini 3.5 Flash        |
-                  |  - Base de Datos SQLite Unificada |
-                  |  - Motor de Aprendizaje Continuo  |
-                  +-----------------+-----------------+
-                                    |
-          +-------------------------+-------------------------+
-          | (WebSocket wss://)                                | (WebSocket wss://)
-          v                                                   v
-+-----------------------+                           +-----------------------+
-|   AGENTE LAPTOP PC    |                           |  APP ANDROID NATIVA   |
-|      (arey-pc)        |                           |    (arey-android)     |
-|                       |                           |                       |
-| - UI Glassmorphic     |                           | - Servicio 24/7       |
-| - Whisper Local (150ms|                           | - Llamadas / SMS      |
-| - Audio Pipeline      |                           | - WhatsApp            |
-| - Control de Windows  |                           | - Alarma EncuentraCel |
-| - Scanner WiFi SSDP   |                           | - Linterna / Bateria  |
-| - Control Smart TV    |                           | - Sincro Contactos    |
-+-----------+-----------+                           +-----------------------+
-            |
-            | (Protocolo Roku ECP / HTTP en red local)
-            v
-+-----------------------+
-|  SMART TV JVC (ROKU)  |
-|     (192.168.1.5)     |
-|                       |
-| - Power / Volumen     |
-| - Netflix / YouTube   |
-+-----------------------+
-
+  [ VOZ DE ANDRIY ]
+         │
+         ▼
+  [ FASTER-WHISPER SMALL (int8) + SILERO VAD ] (~130ms en CPU)
+         │
+         ├─── (Comando de Windows) ───► [ FAST-PATH LOCAL <10ms ] ──► [ EJECUCIÓN INMEDIATA ]
+         │                                                            (Volumen, Mute, Apps, Lock)
+         ▼ (Requiere IA / Dispositivo Remoto)
+  [ WEBSOCKET CON TELEMETRÍA Y ACK (4s) ]
+         │
+         ▼
+  [ ENRUTAMIENTO JERÁRQUICO (3-6 tools) + GEMINI FLASH ]
+         │
+         ▼
+  [ RESPUESTA CON HUMOR SECO Y PRECISIÓN TÉCNICA ]
 
 ================================================================================
-3. COMPONENTES Y COMO FUNCIONA CADA PARTE
+3. COMPONENTES Y ARCHIVOS ACTUALIZADOS DEL SISTEMA
 ================================================================================
 
 --------------------------------------------------------------------------------
-A) CEREBRO CENTRAL EN LA NUBE (arey-server)
+A) AGENTE DE LAPTOP PC (arey-pc)
 --------------------------------------------------------------------------------
-Ubicacion: Carpeta `arey-server/` y desplegado en Docker en Render.com.
-
-1. `app/main.py`:
-   - Servidor web FastAPI asincrono de alto rendimiento.
-   - Endpoint WebSocket `/ws/device/{device_type}`: Mantiene un tunel bidireccional 
-     en tiempo real con la PC y el celular con autenticacion por token.
-   - Endpoints REST:
-     * `POST /api/chat`: Consulta directa por texto.
-     * `POST /api/transcribe`: Endpoint de audio de respaldo.
-     * `POST /api/vision`: Analisis visual multimodal de imagenes y capturas.
-     * `GET /api/devices`: Estado de telemetria de todos los dispositivos.
-
-2. `app/ai/brain.py` (El Cerebro de IA):
-   - Integrado con el SDK oficial de Google GenAI (`google-genai`).
-   - Usa **Gemini 3.5 Flash** y **Gemini 3.5 Flash-Lite** como nucleo, con respaldo 
-     automatico a Gemini 3.7 y 3.1 para garantizar 1,500 peticiones diarias gratis y 
-     cero caidas por cuota.
-   - **Tool Calling Automatico (Function Calling)**: Arey razona que herramienta 
-     necesita usar segun lo que digas y la ejecuta directamente.
-   - **Regla de Deduccion Semantica y Tolerancia Fonetica**: Si hablas rapido o el 
-     microfono deforma palabras (ej. "cuin" por Queen, "espotifai" por Spotify, 
-     "cel" por telefono, "laris" por Larissa), Arey deduce la intencion real y 
-     ejecuta la accion correcta sin titubear ni pedir aclaraciones obvias.
-
-3. `app/ai/tools.py` (Catalogo de 21 Herramientas Disponibles):
-   - `tool_play_music`: Busca y reproduce musica en Spotify o YouTube.
-   - `tool_open_website`: Abre cualquier pagina web o busqueda en el navegador.
-   - `tool_press_hotkey`: Ejecuta atajos de teclado de Windows (ej. Win+D).
-   - `tool_make_phone_call`: Realiza llamadas telefonicas en el celular Android.
-   - `tool_send_sms`: Envia mensajes de texto SMS.
-   - `tool_send_whatsapp`: Envia mensajes directos por WhatsApp.
-   - `tool_find_my_phone`: Dispara la alarma a volumen maximo y linterna estroboscopica.
-   - `tool_set_phone_flashlight`: Enciende o apaga la linterna del celular.
-   - `tool_set_phone_volume`: Ajusta el volumen del telefono.
-   - `tool_open_phone_app`: Abre cualquier app en el celular.
-   - `tool_read_phone_notifications`: Lee notificaciones recibidas en Android.
-   - `tool_open_pc_app`: Abre programas en la laptop (Chrome, VS Code, Calc, etc.).
-   - `tool_set_pc_volume`: Ajusta el volumen maestro de la laptop.
-   - `tool_control_pc_media`: Pausa, reanuda o cambia canciones en Windows.
-   - `tool_lock_pc`: Bloquea la sesion de Windows.
-   - `tool_take_pc_screenshot_and_analyze`: Captura tu pantalla y analiza lo que ves.
-   - `tool_run_pc_command`: Ejecuta comandos de PowerShell de forma controlada.
-   - `tool_scan_network_devices`: Escanea tu red WiFi en busca de Smart TVs y bocinas.
-   - `tool_control_smart_tv`: Controla encendido, volumen y apps de tu Smart TV JVC.
-   - `tool_search_web_live`: Busca en internet en tiempo real para noticias y clima.
-   - `tool_save_personal_fact`: Guarda datos, gustos y reglas en la memoria permanente.
-   - `tool_learn_new_routine`: Crea macros y rutinas por voz ("Modo Cine", etc.).
-   - `tool_set_reminder`: Agenda recordatorios con fecha y hora exacta.
-
-4. `app/ai/memory.py` (Memoria Persistente SQLite):
-   - Archivo de base de datos: `arey_memory.db`.
-   - Mantiene:
-     * `conversation_history`: Historial de charla unificado entre todos tus dispositivos.
-     * `facts_knowledge_base`: Datos personales aprendidos sobre ti (preferencias, reglas).
-     * `routines`: Rutinas automatizadas personalizadas.
-     * `contacts`: Agenda de contactos sincronizada con busqueda difusa (`difflib`) 
-       para encontrar a quien llamas aunque no digas el nombre exacto.
-     * `reminders`: Programacion de alarmas y recordatorios.
-
-5. `app/devices/broker.py` (Broker de Dispositivos):
-   - Enruta mensajes en tiempo real entre la laptop, el telefono y el servidor.
-   - Si el cerebro en la nube decide llamar a alguien, el broker despacha la orden 
-     especificamente al WebSocket del telefono Android y espera la confirmacion.
-
+- `client.py`: Cliente asincrono central que coordina la interfaz Glassmorphic, 
+  el audio pipeline, el Fast-Path local y la conexion WebSocket a Render.
+- `floating_ui.py`: Interfaz flotante futurista Glassmorphism con ondas neon a 
+  60 FPS, atajo global `Alt + Espacio`, badges de bateria de celular y TV.
+- `local_fast_path.py`: Enrutador determinista que ejecuta en <10ms comandos 
+  de volumen, silencio, bloqueo de PC, escritorio y apertura de programas.
+- `performance_tracker.py`: Instrumentacion y logging de latencia por etapa.
+- `audio_pipeline.py`: Hardware-safe audio con Faster-Whisper Small (int8), 
+  Silero VAD para recorte de silencios y deteccion de necesidad de recalibracion.
+- `tv_controller.py`: Controlador Roku ECP con cache persistente en `devices_cache.json` 
+  para disparar comandos en < 400ms a la IP 192.168.1.5.
+- `network_scanner.py`: Escaner hibrido ultra-rapido (ARP + Sonda paralela) en < 1.2s.
+- `train_voice.py` / `entrenar_voz.bat`: Calibrador interactivo guiado por voz.
+- `start_pc_agent.bat`: Lanzador rapido y optimizado sin spam de pip.
 
 --------------------------------------------------------------------------------
-B) AGENTE DE LAPTOP / PC (arey-pc)
+B) CEREBRO CENTRAL EN LA NUBE (arey-server)
 --------------------------------------------------------------------------------
-Ubicacion: Carpeta `arey-pc/`.
-
-1. `floating_ui.py` (Interfaz Flotante Glassmorphism):
-   - Ventana flotante moderna de cristal oscuro (`#0e101a` traslucido con 94% opacidad).
-   - **Ondas de Sonido Neon a 60 FPS**: Barras simetricas que cambian de color:
-     * 💤 Reposo: Azul grisaceo suave.
-     * 🎤 Escuchando: Verde esmeralda brillante.
-     * 🧠 Pensando: Azul electrico rotativo.
-     * 🗣️ Hablando: Magenta / Morado vibrante.
-   - **Badges de Estado en Vivo**: Muestra si tu celular esta conectado, el % de bateria 
-     y el estado de la Smart TV.
-   - **Subtitulos en Vivo**: Muestra en pantalla lo que dijiste y lo que Arey te responde.
-   - **Atajo Global de Teclado**: Presiona `Alt + Espacio` desde cualquier app o juego 
-     para activar a Arey al instante.
-   - **Click-to-talk**: Puedes hacer clic en el boton de la interfaz para hablar.
-   - **Arrastrable y Colapsable**: Doble clic la encoge a una pequena pildora compacta.
-
-2. `audio_pipeline.py` (Pipeline de Audio Blindado):
-   - Gestiona un unico stream de microfono en memoria protegido por candado (`audio_lock`) 
-     para evitar que Windows o Realtek bloqueen el hardware.
-   - **Whisper Neuronal Local**: Modelo `tiny` (int8) en CPU que transcribe en solo 
-     150 milisegundos sin consumir internet ni gastar cuota de API.
-   - **Sintesis de Voz Neuronal**: Edge-TTS con voz `es-MX-DaliaNeural` (ritmo +10%) 
-     para una cadencia conversacional 100% humana.
-   - **Audio Instantaneo Pre-generado**: Respuestas ultra-frecuentes como "¿Si?" se 
-     reproducen en 5 milisegundos desde disco.
-
-3. `pc_controller.py` (Controlador Nativo de Windows):
-   - Modifica el volumen maestro con PowerShell.
-   - Abre aplicaciones mapeadas y comandos nativos.
-   - Busca y reproduce canciones en Spotify (`spotify:search:...`) o YouTube.
-   - Abre paginas web y atajos de teclado (`pyautogui`).
-   - Toma capturas de pantalla completas en Base64 para que la IA las vea.
-   - Monitorea CPU, RAM y bateria de la laptop.
-
-4. `network_scanner.py` & `tv_controller.py` (Control de Smart TV):
-   - Escaneo SSDP / UPnP multicast para descubrir dispositivos en la subred local.
-   - Controlador Roku ECP (External Control Protocol) para enviar comandos HTTP 
-     a la TV JVC (192.168.1.5) para encender, apagar, volumen y abrir apps.
-
-5. `train_voice.py` & `entrenar_voz.bat` (Calibrador de Voz):
-   - Asistente interactivo guiado por voz para calibrar la sensibilidad del microfono 
-     segun el ruido de tu habitacion y aprender la pronunciacion de tus contactos.
-
+- `app/main.py`: FastAPI server con WebSockets `/ws/device/{type}` y endpoints REST.
+- `app/ai/brain.py`: Motor Gemini Flash con personalidad de colega tecnico para Andriy, 
+  enrutamiento jerarquico de 2 pasos (filtra de 21 a 3-6 tools) y protocolo de aclaracion.
+- `app/ai/tools.py`: Catalogo de 21 herramientas probadas (Spotify, YouTube, 
+  Llamadas, WhatsApp, Alarma, TV Roku, Captura de Pantalla, Busqueda Web).
+- `app/ai/memory.py`: Base de datos SQLite unificada (`arey_memory.db`) con 
+  contactos, historial continuo, hechos aprendidos y rutinas.
+- `app/devices/broker.py`: Broker en tiempo real con ACK de 4.0s y avisos proactivos.
+- `.github/workflows/keep_alive.yml`: Pinger externo de GitHub Actions cada 5 min.
 
 --------------------------------------------------------------------------------
-C) APP MOVIL NATIVA ANDROID (arey-android)
+C) APP NATIVA ANDROID (arey-android)
 --------------------------------------------------------------------------------
-Ubicacion: Carpeta `arey-android/`.
-
-1. `AreyBackgroundService.kt`:
-   - Servicio en primer plano (Foreground Service) que mantiene la conexion WebSocket 
-     activa de forma ininterrumpida las 24 horas del dia.
-   - Auto-reconexion automatica si sales de casa o cambias de red WiFi a datos moviles.
-
-2. `CommandReceiver.kt`:
-   - Recibe los comandos enviados desde la nube o desde la laptop y los ejecuta en el hardware:
-     * `make_call`: Abre y ejecuta llamadas telefonicas directas.
-     * `send_sms`: Envia SMS nativos mediante `SmsManager`.
-     * `send_whatsapp`: Abre el chat de WhatsApp con el mensaje pre-cargado.
-     * `find_phone`: Hace sonar una alarma a volumen maximo y parpadea la linterna.
-     * `set_flashlight`: Enciende o apaga el flash de la camara con `CameraManager`.
-     * `set_volume`: Modifica el volumen multimedia / timbre con `AudioManager`.
-     * `open_app`: Lanza cualquier aplicacion instalada por su paquete.
-
-3. `ContactsSync.kt`:
-   - Lee la agenda telefonica del celular y la sincroniza con la base de datos central 
-     de Arey en la nube para que Arey sepa los telefonos de todos tus amigos y familia.
-
+- Servicio en primer plano 24/7 con auto-reconexion.
+- Llamadas telefonicas, SMS, WhatsApp, Alarma de localizacion y Linterna.
+- Sincronizacion de contactos con la memoria en la nube.
 
 ================================================================================
-4. FLUJO COMPLETO PASO A PASO: DE QUE DICES UNA ORDEN A QUE SE EJECUTA
+4. COMANDOS DE VOZ RECOMENDADOS PARA ANDRIY
 ================================================================================
 
-EJEMPLO 1: "Arey, pon rolas de Queen en Spotify"
---------------------------------------------------------------------------------
-1. Pronuncias "Arey" cerca de tu laptop (o presionas `Alt + Espacio`).
-2. El `audio_pipeline.py` en tu laptop detecta la palabra de activacion localmente.
-3. La interfaz `floating_ui.py` se ilumina en verde esmeralda y reproduce "¿Si?" en 5ms.
-4. Dices: "pon rolas de Queen en Spotify".
-5. Whisper local transcribe el audio en ~150ms a texto.
-6. El texto se envia por WebSocket seguro a `wss://arey2-1.onrender.com`.
-7. Gemini 3.5 Flash analiza el mensaje y razona:
-   -> Intencion: Reproducir musica.
-   -> Herramienta seleccionada: `tool_play_music(query='Queen', platform='spotify')`.
-8. El servidor despacha el comando a la laptop.
-9. `pc_controller.py` en Windows abre Spotify y empieza a reproducir a Queen.
-10. Arey responde con voz humana: "Listo, ya te puse a Queen en Spotify."
-11. La interfaz muestra subtitulos y las ondas pulsan en color morado al hablar.
+⚡ COMANDOS LOCALES INSTANTÁNEOS (< 300ms totales):
+  - "Arey, pon volumen al 60%" / "Arey, sube el volumen"
+  - "Arey, silencio" / "Arey, pausa" / "Arey, siguiente cancion"
+  - "Arey, abre la calculadora" / "Arey, abre Visual Studio Code"
+  - "Arey, minimiza todo" / "Arey, bloquea la computadora"
 
-
-EJEMPLO 2: "Arey, ¿donde deje mi telefono?"
---------------------------------------------------------------------------------
-1. Le dices a la laptop: "Arey, no encuentro mi celular".
-2. Gemini deduce que requieres la herramienta `tool_find_my_phone()`.
-3. El servidor envia la orden por WebSocket al celular Huawei P30 Lite.
-4. El celular recibe la orden, sube su volumen al 100%, empieza a sonar una alarma 
-   fuerte y hace parpadear la linterna LED trasera para que lo veas en la oscuridad.
-5. Arey te dice por los altavoces de la laptop: "Ya le active la alarma y la linterna a tu cel para que lo encuentres."
-
-
-EJEMPLO 3: "Arey, apaga la tele y pon musica para dormir"
---------------------------------------------------------------------------------
-1. Dices la orden a Arey.
-2. Gemini detecta una orden multiple (multitarea):
-   -> 1. `tool_control_smart_tv(command='power')`.
-   -> 2. `tool_play_music(query='musica relajante para dormir', platform='spotify')`.
-3. La laptop manda la senal HTTP por red local a la Smart TV JVC (192.168.1.5) y la apaga.
-4. La laptop abre Spotify y pone la playlist relajante.
-5. Arey confirma: "Tele apagada y musica relajante puesta. Que descanses."
-
+🧠 COMANDOS CON INTELIGENCIA ARTIFICIAL Y NUBE:
+  - "Arey, pon rolas de Queen en Spotify"
+  - "Arey, ¿donde deje mi telefono?" (Suena alarma en el Huawei P30 Lite)
+  - "Arey, enciende la tele y pon Netflix"
+  - "Arey, ¿que dispositivos hay en mi red?" (Escanea en 1.2s)
+  - "Arey, ¿como esta el clima hoy?" (Busca en vivo en internet)
+  - "Arey, ¿que hay en mi pantalla?" (Analisis visual de monitor)
+  - "Arey, ¿por que me sale este error en SQL?" (Consejo tecnico de colega)
 
 ================================================================================
-5. GUIA RAPIDA DE COMANDOS QUE PUEDES DECIRLE A AREY
+5. INICIO DEL SISTEMA
 ================================================================================
+En tu laptop, simplemente haz doble clic en:
+👉 `arey-pc\start_pc_agent.bat`
 
-🎵 MUSICA Y MULTIMEDIA:
-  - "Arey, pon canciones de Bad Bunny en Spotify"
-  - "Arey, pon lofi hip hop en YouTube"
-  - "Arey, pausa la musica" / "Siguiente cancion"
-  - "Arey, sube el volumen al 80%"
-
-📱 CELULAR ANDROID:
-  - "Arey, ¿donde esta mi telefono?" (Hace sonar la alarma y enciende linterna)
-  - "Arey, llama a Larissa"
-  - "Arey, mandale un WhatsApp a Papa diciendole que ya voy para alla"
-  - "Arey, enciende la linterna de mi celular"
-  - "Arey, ¿cuanta bateria le queda a mi telefono?"
-
-📺 SMART TV (ROKU / JVC):
-  - "Arey, enciende la tele" / "Apaga la tele"
-  - "Arey, pon Netflix en la tele"
-  - "Arey, pon YouTube en la television"
-  - "Arey, sube el volumen de la tele"
-
-💻 LAPTOP / WINDOWS:
-  - "Arey, abre Visual Studio Code" / "Abre la calculadora" / "Abre el bloc de notas"
-  - "Arey, abre ChatGPT" / "Abre MercadoLibre"
-  - "Arey, minimiza todo y muestra el escritorio"
-  - "Arey, bloquea mi computadora"
-  - "Arey, ¿que hay en mi pantalla? Lee lo que tengo abierto"
-
-🧠 CONVERSACION, PREGUNTAS E IDEAS:
-  - "Arey, ¿que me recomiendas cenar hoy con pocos ingredientes?"
-  - "Arey, recomiendame 3 peliculas de misterio buenas"
-  - "Arey, ¿como va a estar el clima hoy?" (Busca en tiempo real en internet)
-  - "Arey, recuerda que mi comida favorita son los tacos al pastor" (Lo guarda para siempre)
-
+Presiona `Alt + Espacio` o di "Arey" para hablar.
 
 ================================================================================
-6. COMO INICIAR EL SISTEMA EN EL DIA A DIA
-================================================================================
-
-1. SERVIDOR EN LA NUBE:
-   Ya esta funcionando las 24 horas del dia en Render.com (no necesitas abrir nada).
-
-2. EN TU CELULAR ANDROID:
-   Abre la aplicacion "Arey" una vez y asegurate de ver "Estado: Conectado". 
-   (El servicio seguira corriendo en segundo plano aunque bloquees el celular).
-   Si agregaste nuevos contactos, presiona "Sincronizar Contactos con Arey".
-
-3. EN TU LAPTOP WINDOWS:
-   Haz doble clic en el archivo:
-   👉 `arey-pc\start_pc_agent.bat`
-   
-   Aparecera la Capsula Flotante Glassmorphic en tu pantalla.
-   Ya puedes hablarle diciendo "Arey" o presionando `Alt + Espacio` en tu teclado.
-
-4. SI DESEAS CALIBRAR TU VOZ:
-   Haz doble clic en:
-   👉 `arey-pc\entrenar_voz.bat`
-   y sigue las instrucciones guiadas por voz para registrar tu acento y pronunciacion.
-
-================================================================================
-FIN DE LA DOCUMENTACION - AREY 2.0 ECOSYSTEM
+FIN DE LA DOCUMENTACION - AREY 2.1 CLEAN & MODERNIZED
 ================================================================================

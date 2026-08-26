@@ -1,24 +1,28 @@
 @echo off
-title Arey - Agente de Laptop (Windows)
+title Arey 2.1 - Agente de Laptop (Windows)
+color 0b
 echo =======================================================
-echo          INICIANDO AGENTE DE LAPTOP - AREY AI
+echo          INICIANDO AGENTE DE LAPTOP - AREY 2.1
 echo =======================================================
 echo.
 
 cd /d "%~dp0"
 
 if not exist venv (
-    echo Creando entorno virtual de Python...
+    echo [1/2] Creando entorno virtual de Python...
     python -m venv venv
+    echo [2/2] Instalando dependencias iniciales...
+    call venv\Scripts\activate.bat
+    pip install -r requirements.txt --quiet
+) else (
+    call venv\Scripts\activate.bat
 )
 
-call venv\Scripts\activate.bat
-
-echo Instalando / Verificando dependencias...
-pip install -r requirements.txt
-
-echo.
 echo Conectando con el Cerebro Central de Arey...
 python client.py
 
-pause
+if errorlevel 1 (
+    echo.
+    echo Ocurrio un error inesperado al cerrar Arey.
+    pause
+)
