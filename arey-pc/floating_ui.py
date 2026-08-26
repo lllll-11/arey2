@@ -23,14 +23,12 @@ class SignalCompat:
 class UIBridge:
     """
     Puente de comunicación bidireccional entre Python y la interfaz Web/HTML5.
-    Soporta tanto llamadas directas como compatibilidad PyQt .emit()
     """
     def __init__(self):
         self.window = None
         self.on_wake_requested = None
         self.on_media_control = None
 
-        # Señales compatibles con PyQt
         self.state_changed = SignalCompat(self.emit_state)
         self.subtitle_changed = SignalCompat(self.emit_subtitle)
         self.device_status_changed = SignalCompat(self._handle_device_status_dict)
@@ -67,7 +65,7 @@ class UIBridge:
         tv_online = data.get("tv_online", True)
         self.emit_devices(phone_online, phone_batt, tv_online)
 
-    def emit_music(self, active: bool, title: str = "Spotify Music", artist: str = "Reproduciendo en PC"):
+    def emit_music(self, active: bool, title: str = "Spotify Music", artist: str = "Reproduciendo"):
         if self.window:
             try:
                 clean_title = json.dumps(title)
@@ -101,22 +99,17 @@ class JsApi:
             except Exception as e:
                 logger.debug(f"Error controlando media: {e}")
 
-    def close_window(self):
-        if self.bridge.window:
-            self.bridge.window.destroy()
-
 ui_bridge = UIBridge()
 
 def start_floating_ui(on_wake_callback=None, on_media_callback=None):
     """
-    Inicia la cápsula flotante Glassmorphic con WebKit/WebView2 nativo acelerado por GPU.
+    Inicia la esfera líquida flotante ultra-transparente acelerada por GPU.
     """
     ui_bridge.on_wake_requested = on_wake_callback
     ui_bridge.on_media_control = on_media_callback
 
     js_api = JsApi(ui_bridge)
 
-    # Atajo global Alt + Espacio
     try:
         def on_global_hotkey():
             logger.info("⌨️ Atajo global [Alt + Espacio] presionado.")
@@ -127,15 +120,16 @@ def start_floating_ui(on_wake_callback=None, on_media_callback=None):
     except Exception as e:
         logger.warning(f"No se pudo registrar atajo Alt+Espacio: {e}")
 
-    # Crear ventana transparente sin bordes siempre visible
+    # Ventana 100% transparente sin bordes ni cajas rectangulares
     window = webview.create_window(
-        title="Arey Assistant",
+        title="Arey",
         url=HTML_FILE,
-        width=360,
-        height=520,
+        width=270,
+        height=350,
         frameless=True,
         easy_drag=True,
         transparent=True,
+        background_color='#00000000',
         on_top=True,
         js_api=js_api
     )

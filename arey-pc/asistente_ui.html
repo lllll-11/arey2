@@ -3,90 +3,82 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Arey 2.1 - Interfaz Ultra-Minimalista</title>
+  <title>Arey 2.1 - Pure Aura Orb</title>
   
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Outfit:wght@500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
   
   <style>
     * {
       user-select: none;
       -webkit-user-select: none;
+      box-sizing: border-box;
     }
     
     html, body {
       background: transparent !important;
+      background-color: transparent !important;
       overflow: hidden;
       margin: 0;
       padding: 0;
       width: 100vw;
       height: 100vh;
       display: flex;
+      flex-direction: column;
       align-items: center;
       justify-content: center;
-      font-family: 'Inter', sans-serif;
-    }
-
-    .font-outfit {
       font-family: 'Outfit', sans-serif;
     }
 
-    .drag-header {
-      -webkit-app-region: drag;
+    /* Floating Draggable Orb Container */
+    .orb-wrapper {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
       cursor: grab;
+      -webkit-app-region: drag;
     }
-    .drag-header:active {
+    .orb-wrapper:active {
       cursor: grabbing;
     }
-    .no-drag {
-      -webkit-app-region: no-drag;
-    }
 
-    /* Glass Container */
-    .glass-card {
-      background: rgba(13, 15, 22, 0.72);
-      backdrop-filter: blur(40px);
-      -webkit-backdrop-filter: blur(40px);
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      box-shadow: 
-        0 30px 60px -15px rgba(0, 0, 0, 0.85),
-        inset 0 1px 1px 0 rgba(255, 255, 255, 0.12);
-      transition: height 0.5s cubic-bezier(0.16, 1, 0.3, 1), transform 0.3s ease;
-    }
-
-    /* Floating Window Animation */
-    @keyframes floatWindow {
+    /* Floating Animation */
+    @keyframes floatOrb {
       0%, 100% { transform: translateY(0px); }
-      50% { transform: translateY(-5px); }
+      50% { transform: translateY(-8px); }
     }
 
     .animate-float {
-      animation: floatWindow 5s ease-in-out infinite;
+      animation: floatOrb 5s ease-in-out infinite;
     }
 
     /* Glowing Aura Background with smooth interpolation */
     .glow-aura {
-      transition: background-color 1.2s cubic-bezier(0.4, 0, 0.2, 1), opacity 1s ease, transform 1s ease, box-shadow 1.2s ease;
-      filter: blur(50px);
+      transition: background-color 1.2s cubic-bezier(0.4, 0, 0.2, 1), opacity 1s ease, filter 1s ease;
+      filter: blur(45px);
+      will-change: background-color, filter, opacity;
     }
 
-    /* Dynamic Status Toast */
-    .status-toast {
-      transition: opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1), transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    /* Minimalist Subtitles / Toast */
+    .subtitle-toast {
+      transition: opacity 0.5s cubic-bezier(0.4, 0, 0.2, 1), transform 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+      -webkit-app-region: no-drag;
     }
-    .status-toast.hidden-state {
+    .subtitle-toast.hidden-state {
       opacity: 0;
       transform: translateY(6px) scale(0.95);
       pointer-events: none;
     }
-    .status-toast.visible-state {
+    .subtitle-toast.visible-state {
       opacity: 1;
       transform: translateY(0px) scale(1);
     }
 
-    /* Expandable Music Player Animations (Conditional) */
+    /* Expandable Music Player (Conditional: ONLY when music is active) */
     .music-player-panel {
       transition: max-height 0.6s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.45s ease, transform 0.45s ease, margin-top 0.4s ease;
       max-height: 0;
@@ -94,6 +86,7 @@
       overflow: hidden;
       transform: translateY(12px) scale(0.95);
       pointer-events: none;
+      -webkit-app-region: no-drag;
     }
 
     .music-player-panel.active {
@@ -136,114 +129,77 @@
       animation-play-state: paused;
       transform: scaleY(0.2);
     }
-
-    /* Subtitle Live Glow */
-    .subtitles-box {
-      transition: all 0.3s ease;
-    }
   </style>
 </head>
-<body class="select-none text-white relative">
+<body class="select-none">
 
-  <!-- Ambient Light Reflection -->
-  <div class="absolute inset-0 pointer-events-none flex items-center justify-center opacity-25">
-    <div id="ambientBg" class="w-[360px] h-[360px] rounded-full blur-[100px] transition-all duration-1000 bg-cyan-500/30"></div>
-  </div>
-
-  <!-- Main Floating Glass Capsule -->
-  <div id="mainWidget" class="glass-card relative w-[310px] rounded-[38px] p-5 flex flex-col items-center justify-between animate-float no-drag">
+  <!-- Pure Minimalist Orb Container (Zero Box, Zero Borders) -->
+  <div class="orb-wrapper animate-float">
     
-    <!-- Top Header (Draggable Zone) -->
-    <div class="w-full flex items-center justify-between text-zinc-400 text-xs font-medium px-1 drag-header py-0.5">
-      <div class="flex items-center gap-2">
-        <span id="statusDot" class="w-2 h-2 rounded-full bg-cyan-400 transition-colors duration-700 animate-pulse"></span>
-        <span class="tracking-widest uppercase text-[10px] font-bold text-zinc-300 font-outfit">AREY 2.1</span>
-      </div>
-
-      <!-- Telemetry Badges & Close Button -->
-      <div class="flex items-center gap-2 no-drag">
-        <div id="phoneBadge" class="flex items-center gap-1 text-[9px] font-semibold px-2 py-0.5 rounded-full bg-white/5 text-zinc-400 border border-white/5" title="Estado de Teléfono Huawei">
-          <span>📱</span>
-          <span id="phoneBattText">--%</span>
-        </div>
-
-        <button onclick="closeApp()" class="w-5 h-5 rounded-full bg-white/5 hover:bg-red-500/40 text-zinc-400 hover:text-white flex items-center justify-center transition-all text-xs" title="Ocultar">
-          ✕
-        </button>
-      </div>
-    </div>
-
-    <!-- Center Liquid Fluid Orb Canvas -->
-    <div class="relative w-[190px] h-[190px] my-1 flex items-center justify-center cursor-pointer group no-drag" onclick="handleOrbClick()" title="Haz clic o presiona Alt + Espacio para hablar">
-      <!-- Ambient Aura Glow behind Orb -->
-      <div id="orbGlow" class="glow-aura absolute inset-2 rounded-full opacity-70 bg-cyan-500"></div>
+    <!-- Central Fluid Sphere & Aura -->
+    <div class="relative w-[210px] h-[210px] flex items-center justify-center cursor-pointer group" onclick="handleOrbClick()" title="Haz clic o presiona Alt + Espacio">
+      <!-- Dynamic Ambient Aura Glow behind Orb (Smooth Color Transition) -->
+      <div id="orbGlow" class="glow-aura absolute inset-3 rounded-full opacity-80 bg-cyan-400"></div>
 
       <!-- Canvas for Liquid Visual Physics (60 FPS) -->
-      <canvas id="orbCanvas" width="220" height="220" class="relative z-10 w-[190px] h-[190px] drop-shadow-[0_16px_30px_rgba(0,0,0,0.7)] transition-transform duration-300 group-hover:scale-[1.04] group-active:scale-[0.96]"></canvas>
+      <canvas id="orbCanvas" width="240" height="240" class="relative z-10 w-[210px] h-[210px] drop-shadow-[0_16px_35px_rgba(0,0,0,0.6)] transition-transform duration-300 group-hover:scale-[1.05] group-active:scale-[0.95]"></canvas>
     </div>
 
-    <!-- Dynamic Status Toast / Mode Indicator -->
-    <div id="statusToast" class="status-toast visible-state flex items-center gap-2 px-3.5 py-1 rounded-full bg-white/5 border border-white/10 backdrop-blur-md mb-1 no-drag">
-      <span id="modeIcon" class="w-1.5 h-1.5 rounded-full bg-cyan-400 transition-colors duration-500"></span>
-      <span id="statusTitle" class="font-outfit text-xs font-semibold tracking-wide text-white transition-all duration-300">
+    <!-- Minimalist Floating Subtitle Pill (Aparece suavemente al hablar o dar estado) -->
+    <div id="statusToast" class="subtitle-toast visible-state flex items-center gap-2 px-4 py-1.5 rounded-full bg-black/60 border border-white/10 backdrop-blur-xl shadow-2xl mt-1 max-w-[240px]">
+      <span id="modeDot" class="w-2 h-2 rounded-full bg-cyan-400 animate-pulse flex-shrink-0"></span>
+      <span id="statusText" class="text-xs font-medium text-white/90 tracking-wide truncate">
         Escuchando...
       </span>
     </div>
 
-    <!-- Live Subtitle Box (User & Arey Speech) -->
-    <div id="subtitleBox" class="w-full text-center px-2 py-1 min-h-[32px] flex items-center justify-center subtitles-box no-drag">
-      <span id="subtitleText" class="text-[11px] font-medium text-zinc-300/90 leading-tight italic line-clamp-2">
-        Di "Arey" o presiona Alt + Espacio
-      </span>
-    </div>
-
-    <!-- Minimalist Expandable Music Player Panel (Conditional: ONLY when music plays) -->
-    <div id="musicPlayerPanel" class="music-player-panel w-full no-drag">
-      <div class="w-full bg-white/[0.04] border border-white/10 rounded-2xl p-3 flex flex-col gap-2 backdrop-blur-md shadow-inner">
+    <!-- Minimalist Expandable Music Player Panel (Aparece SOLO cuando suena música) -->
+    <div id="musicPlayerPanel" class="music-player-panel w-[230px]">
+      <div class="w-full bg-black/60 border border-white/10 rounded-2xl p-2.5 flex flex-col gap-2 backdrop-blur-xl shadow-2xl">
         
         <!-- Track Info & Live Equalizer -->
         <div class="flex items-center justify-between">
-          <div class="flex items-center gap-2.5">
+          <div class="flex items-center gap-2">
             <!-- Vinyl Album Disc -->
-            <div class="relative w-9 h-9 rounded-full overflow-hidden border border-white/20 shadow-md flex-shrink-0">
+            <div class="relative w-8 h-8 rounded-full overflow-hidden border border-white/20 shadow-md flex-shrink-0">
               <div id="albumDisc" class="spin-disc w-full h-full bg-gradient-to-br from-emerald-400 via-teal-600 to-indigo-900 flex items-center justify-center">
-                <div class="w-2.5 h-2.5 bg-zinc-950 rounded-full border border-white/40"></div>
+                <div class="w-2 h-2 bg-zinc-950 rounded-full border border-white/40"></div>
               </div>
             </div>
 
             <!-- Song & Artist Details -->
             <div class="flex flex-col overflow-hidden">
-              <span id="trackTitle" class="font-outfit text-xs font-bold text-white tracking-wide truncate max-w-[130px]">
-                Spotify Music
+              <span id="trackTitle" class="text-[11px] font-bold text-white tracking-wide truncate max-w-[110px]">
+                Spotify
               </span>
-              <span id="trackArtist" class="text-[9px] text-emerald-400 font-medium tracking-wider flex items-center gap-1">
-                Reproduciendo en PC
+              <span id="trackArtist" class="text-[8px] text-emerald-400 font-semibold tracking-wider">
+                Reproduciendo
               </span>
             </div>
           </div>
 
           <!-- Animated Equalizer Bars -->
-          <div id="eqContainer" class="flex items-end gap-0.5 h-3.5 px-1">
-            <span class="eq-bar w-0.5 h-3.5 bg-emerald-400 rounded-full"></span>
-            <span class="eq-bar w-0.5 h-3.5 bg-emerald-400 rounded-full"></span>
-            <span class="eq-bar w-0.5 h-3.5 bg-emerald-400 rounded-full"></span>
-            <span class="eq-bar w-0.5 h-3.5 bg-emerald-400 rounded-full"></span>
+          <div id="eqContainer" class="flex items-end gap-0.5 h-3 px-1">
+            <span class="eq-bar w-0.5 h-3 bg-emerald-400 rounded-full"></span>
+            <span class="eq-bar w-0.5 h-3 bg-emerald-400 rounded-full"></span>
+            <span class="eq-bar w-0.5 h-3 bg-emerald-400 rounded-full"></span>
+            <span class="eq-bar w-0.5 h-3 bg-emerald-400 rounded-full"></span>
           </div>
         </div>
 
-        <!-- Playback Controls -->
-        <div class="flex items-center justify-center gap-5 pt-0.5 text-zinc-300">
-          <button onclick="controlMedia('prev')" class="hover:text-white transition-colors p-1" title="Anterior">
-            <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg>
+        <!-- Mini Controls -->
+        <div class="flex items-center justify-center gap-4 text-zinc-300 pt-0.5">
+          <button onclick="controlMedia('prev')" class="hover:text-white transition-colors" title="Anterior">
+            <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 24 24"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg>
           </button>
           
-          <button onclick="controlMedia('play_pause')" class="w-7 h-7 rounded-full bg-emerald-500 text-zinc-950 flex items-center justify-center hover:scale-105 active:scale-95 transition-all shadow-lg shadow-emerald-500/25" title="Play / Pausa">
-            <svg id="playIcon" class="w-3.5 h-3.5 hidden" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
-            <svg id="pauseIcon" class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+          <button onclick="controlMedia('play_pause')" class="w-6 h-6 rounded-full bg-emerald-500 text-zinc-950 flex items-center justify-center hover:scale-105 active:scale-95 transition-all shadow-md shadow-emerald-500/25" title="Play / Pausa">
+            <svg id="playIcon" class="w-3 h-3 hidden" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+            <svg id="pauseIcon" class="w-3 h-3" fill="currentColor" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
           </button>
 
-          <button onclick="controlMedia('next')" class="hover:text-white transition-colors p-1" title="Siguiente">
-            <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg>
+          <button onclick="controlMedia('next')" class="hover:text-white transition-colors" title="Siguiente">
+            <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 24 24"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg>
           </button>
         </div>
 
@@ -253,72 +209,66 @@
   </div>
 
   <script>
-    // ==================== 5 MODOS ESPECÍFICOS CON COLORES DE AURA ====================
+    // ==================== 5 MODOS CON COLORES DE AURA EXCLUSIVOS ====================
     const MODES = {
       escuchando: {
         title: "Escuchando...",
         dotColor: "bg-cyan-400",
-        glowClass: "bg-cyan-500",
-        bgClass: "bg-cyan-500/30",
+        glowClass: "bg-cyan-400",
         colors: ['#00f2fe', '#4facfe', '#0066ff', '#00c6ff'], // Azul Cian vibrante
         speed: 0.055,
         reactivity: 0.42,
-        baseRadius: 62,
+        baseRadius: 65,
         freq1: 3, freq2: 5, freq3: 7
       },
       pensando: {
         title: "Pensando...",
         dotColor: "bg-purple-400",
-        glowClass: "bg-purple-600",
-        bgClass: "bg-purple-600/30",
+        glowClass: "bg-purple-500",
         colors: ['#a855f7', '#7c3aed', '#6366f1', '#c084fc'], // Violeta / Púrpura cósmico
         speed: 0.09,
         reactivity: 0.22,
-        baseRadius: 58,
+        baseRadius: 60,
         freq1: 4, freq2: 6, freq3: 9
       },
       trabajando: {
         title: "Trabajando...",
         dotColor: "bg-amber-400",
         glowClass: "bg-amber-500",
-        bgClass: "bg-amber-500/30",
         colors: ['#f59e0b', '#d97706', '#f97316', '#fbbf24'], // Ámbar / Naranja dorado
         speed: 0.04,
         reactivity: 0.14,
-        baseRadius: 64,
+        baseRadius: 66,
         freq1: 2, freq2: 4, freq3: 6
       },
       analizando: {
         title: "Analizando...",
         dotColor: "bg-emerald-400",
-        glowClass: "bg-emerald-500",
-        bgClass: "bg-emerald-500/30",
+        glowClass: "bg-emerald-400",
         colors: ['#10b981', '#059669', '#06b6d4', '#34d399'], // Verde Esmeralda / Turquesa técnico
         speed: 0.075,
         reactivity: 0.28,
-        baseRadius: 60,
+        baseRadius: 62,
         freq1: 5, freq2: 8, freq3: 12
       },
       hablando: {
         title: "Hablando...",
         dotColor: "bg-rose-400",
         glowClass: "bg-rose-500",
-        bgClass: "bg-rose-500/30",
         colors: ['#ec4899', '#f43f5e', '#fb7185', '#e11d48'], // Rosa Coral / Carmesí rítmico
         speed: 0.065,
         reactivity: 0.52,
-        baseRadius: 66,
+        baseRadius: 68,
         freq1: 3, freq2: 5, freq3: 8
       },
       musica: {
         title: "Reproduciendo Música...",
         dotColor: "bg-emerald-400",
-        glowClass: "bg-emerald-500",
-        bgClass: "bg-emerald-500/30",
+        glowClass: "bg-emerald-400",
         colors: ['#1ed760', '#1db954', '#00d2ff', '#10b981'],
         speed: 0.08,
         reactivity: 0.46,
-        baseRadius: 65,
+        baseRadius: 67,
         freq1: 4, freq2: 7, freq3: 10
       }
     };
@@ -339,24 +289,22 @@
     let time = 0;
     let toastTimeout = null;
 
-    // ==================== RENDERIZADO FLUIDO 60 FPS CON INTERPOLACIÓN ====================
+    // ==================== RENDERIZADO FLUIDO CON INTERPOLACIÓN CONTINUA ====================
     function renderOrb() {
       ctx.clearRect(0, 0, width, height);
 
       const mode = MODES[currentModeKey] || MODES.escuchando;
       time += mode.speed;
 
-      // Interpolación continua suave de colores (Color Blending frame por frame)
+      // Color Blending suave frame a frame
       for (let c = 0; c < 4; c++) {
         interpolatedColors[c] = blendHexColors(interpolatedColors[c], mode.colors[c], 0.08);
       }
 
-      // Física de reacción elástica
       let dynamicReactivity = Math.sin(time * 6) * mode.reactivity + (mode.reactivity * 0.5);
       const baseRadius = mode.baseRadius + (dynamicReactivity * 10);
       const points = 120;
       
-      // Gradiente Radial de Alta Fidelidad
       const gradient = ctx.createRadialGradient(
         centerX + Math.sin(time) * 14, 
         centerY + Math.cos(time) * 14, 
@@ -395,7 +343,7 @@
       ctx.fillStyle = gradient;
       ctx.fill();
 
-      // Brillo 3D Especular Interno
+      // Brillo Especular 3D
       const innerGlow = ctx.createRadialGradient(
         centerX - 12, centerY - 18, 3,
         centerX, centerY, baseRadius
@@ -424,7 +372,7 @@
       requestAnimationFrame(renderOrb);
     }
 
-    // ==================== CONTROL DE MODOS ====================
+    // ==================== CAMBIO DE MODOS ====================
     function setMode(modeKey) {
       const mapped = modeKey.toLowerCase();
       let targetKey = mapped;
@@ -440,26 +388,22 @@
       currentModeKey = targetKey;
       const mode = MODES[targetKey];
 
-      // Actualizar texto e iconos
-      document.getElementById('statusTitle').textContent = mode.title;
-      document.getElementById('modeIcon').className = `w-1.5 h-1.5 rounded-full ${mode.dotColor} transition-colors duration-500`;
-      document.getElementById('statusDot').className = `w-2 h-2 rounded-full ${mode.dotColor} transition-colors duration-700 animate-pulse`;
+      document.getElementById('statusText').textContent = mode.title;
+      document.getElementById('modeDot').className = `w-2 h-2 rounded-full ${mode.dotColor} animate-pulse flex-shrink-0`;
 
-      // Actualizar Aura y Fondo con interpolación suave
-      document.getElementById('orbGlow').className = `glow-aura absolute inset-2 rounded-full opacity-70 ${mode.glowClass}`;
-      document.getElementById('ambientBg').className = `w-[360px] h-[360px] rounded-full blur-[100px] transition-all duration-1000 ${mode.bgClass}`;
+      // Actualizar aura
+      document.getElementById('orbGlow').className = `glow-aura absolute inset-3 rounded-full opacity-80 ${mode.glowClass}`;
 
-      // Toast suave
       const toast = document.getElementById('statusToast');
       toast.classList.remove('hidden-state');
       toast.classList.add('visible-state');
 
       clearTimeout(toastTimeout);
-      if (!isMusicActive) {
+      if (!isMusicActive && targetKey === 'escuchando') {
         toastTimeout = setTimeout(() => {
           toast.classList.remove('visible-state');
           toast.classList.add('hidden-state');
-        }, 3500);
+        }, 4000);
       }
     }
 
@@ -481,33 +425,27 @@
     }
 
     function setSubtitle(speaker, text) {
-      const subEl = document.getElementById('subtitleText');
+      const subEl = document.getElementById('statusText');
       if (!text || !text.trim()) {
         subEl.textContent = 'Di "Arey" o presiona Alt + Espacio';
         return;
       }
       if (speaker === 'user') {
-        subEl.innerHTML = `<span class="text-cyan-400 font-semibold">Tú:</span> "${text}"`;
+        subEl.innerHTML = `<span class="text-cyan-400 font-semibold">Tú:</span> ${text}`;
       } else if (speaker === 'arey') {
         subEl.innerHTML = `<span class="text-rose-400 font-semibold">Arey:</span> ${text}`;
       } else {
         subEl.textContent = text;
       }
+      const toast = document.getElementById('statusToast');
+      toast.classList.remove('hidden-state');
+      toast.classList.add('visible-state');
     }
 
     function updateDevices(phoneOnline, phoneBatt, tvOnline) {
-      const battEl = document.getElementById('phoneBattText');
-      const badge = document.getElementById('phoneBadge');
-      if (phoneOnline) {
-        battEl.textContent = `${phoneBatt || 0}%`;
-        badge.className = "flex items-center gap-1 text-[9px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20";
-      } else {
-        battEl.textContent = "off";
-        badge.className = "flex items-center gap-1 text-[9px] font-semibold px-2 py-0.5 rounded-full bg-white/5 text-zinc-500 border border-white/5";
-      }
+      // Minimalista puro
     }
 
-    // Helper: Blend Colors
     function blendHexColors(c1, c2, factor) {
       const parseHex = (hex) => {
         let h = hex.replace('#', '');
@@ -526,7 +464,6 @@
       }
     }
 
-    // ==================== INTERACCIÓN CON PYTHON ====================
     function handleOrbClick() {
       if (window.pywebview && window.pywebview.api) {
         window.pywebview.api.on_orb_clicked();
@@ -543,12 +480,6 @@
         document.getElementById('eqContainer').classList.toggle('eq-paused', !isPlaying);
         document.getElementById('playIcon').classList.toggle('hidden', isPlaying);
         document.getElementById('pauseIcon').classList.toggle('hidden', !isPlaying);
-      }
-    }
-
-    function closeApp() {
-      if (window.pywebview && window.pywebview.api) {
-        window.pywebview.api.close_window();
       }
     }
 
