@@ -59,7 +59,7 @@ class AudioPipeline:
             "cuin": "Queen",
             "badboni": "Bad Bunny", "bad boni": "Bad Bunny", "bad buni": "Bad Bunny",
             "cel": "teléfono", "celu": "teléfono", "fono": "teléfono",
-            "tele": "tele", "la tele": "la tele", "pantalla": "tele",
+            "tele": "tele", "la tele": "la tele",
             "laris": "Larissa", "larisa": "Larissa", "larisse": "Larissa", "lari": "Larissa"
         }
 
