@@ -1,6 +1,5 @@
 import os
 import re
-import io
 import sys
 import json
 import time
@@ -14,6 +13,7 @@ import speech_recognition as sr
 import edge_tts
 import pygame
 import numpy as np
+from faster_whisper import WhisperModel
 
 from config import VOICE_NAME
 from performance_tracker import perf_tracker
@@ -21,15 +21,12 @@ from performance_tracker import perf_tracker
 logger = logging.getLogger("AreyAudioPipeline")
 PROFILE_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "user_voice_profile.json"))
 
-# Candado mutex para acceso exclusivo al hardware de audio
 audio_lock = threading.Lock()
 
 class AudioPipeline:
     """
-    Pipeline de audio de alta velocidad y fluidez conversacional:
-    - Transcripción neuronal ultra-rápida (Google Cloud STT ~300ms + Whisper Tiny local in-memory fallback).
-    - Silero VAD optimizado para corte instantáneo de silencios.
-    - Cero bloqueos de CPU.
+    Pipeline de audio de alta precisión fonética con Faster-Whisper 'small' (int8),
+    Silero VAD y procesamiento en memoria RAM sin escritura en disco.
     """
     def __init__(self):
         if not pygame.mixer.get_init():
@@ -38,15 +35,20 @@ class AudioPipeline:
         self.recognizer = sr.Recognizer()
         self.recognizer.energy_threshold = 80
         self.recognizer.dynamic_energy_threshold = False
-        self.recognizer.pause_threshold = 0.85 # +1 segundo de margen para pausas naturales
+        self.recognizer.pause_threshold = 0.85 # Margen cómodo de pausas naturales
         self.recognizer.non_speaking_duration = 0.35
 
         self.microphone = self._get_best_microphone()
         self.consecutive_empty_count = 0
 
-        # Cargar Whisper Tiny como respaldo local en memoria
-        self.whisper_model = None
-        self._load_whisper_lazy()
+        # Cargar Faster-Whisper Small cuantizado en int8 para CPU
+        logger.info("🧠 Cargando modelo neuronal Faster-Whisper 'small' (int8)...")
+        try:
+            self.whisper = WhisperModel("small", device="cpu", compute_type="int8")
+            logger.info("✅ Faster-Whisper 'small' listo con máxima precisión fonética.")
+        except Exception as e:
+            logger.warning(f"Fallback a 'base' por error ({e})...")
+            self.whisper = WhisperModel("base", device="cpu", compute_type="int8")
 
         self.assets_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "assets"))
         os.makedirs(self.assets_dir, exist_ok=True)
@@ -54,8 +56,8 @@ class AudioPipeline:
 
         self.base_wake_words = [
             "arey", "ari", "aree", "haré", "aré", "are", "aire", "área",
-            "hari", "harry", "oye arey", "hey arey", "hola arey", "oye ari",
-            "oye", "hey", "dime", "asistente"
+            "hari", "harry", "araí", "arai", "oye arey", "hey arey", "hola arey",
+            "oye ari", "oye", "hey", "dime", "asistente"
         ]
         self.phonetic_map = {
             "spoty": "Spotify", "espotifai": "Spotify", "spotifay": "Spotify", "spoti": "Spotify",
@@ -70,16 +72,6 @@ class AudioPipeline:
             "tele": "tele", "la tele": "la tele", "pantalla": "tele",
             "laris": "Larissa", "larisa": "Larissa", "larisse": "Larissa", "lari": "Larissa"
         }
-
-    def _load_whisper_lazy(self):
-        def _bg_load():
-            try:
-                from faster_whisper import WhisperModel
-                self.whisper_model = WhisperModel("tiny", device="cpu", compute_type="int8")
-                logger.info("✅ Whisper local Tiny listo como respaldo in-memory.")
-            except Exception as e:
-                logger.debug(f"Whisper fallback load: {e}")
-        threading.Thread(target=_bg_load, daemon=True).start()
 
     def _get_best_microphone(self) -> sr.Microphone:
         try:
@@ -124,46 +116,38 @@ class AudioPipeline:
 
     def transcribe_audio(self, audio_data: sr.AudioData) -> str:
         """
-        Transcripción híbrida de ultra-baja latencia:
-        1. Google Cloud STT (~250-350ms con 99.9% precisión en español mexicano).
-        2. Faster-Whisper local in-memory como respaldo inmediato sin conexión.
+        Transcripción neuronal directa en memoria RAM con Faster-Whisper Small + Silero VAD.
         """
-        perf_tracker.start_stage("STT Transcripción")
+        perf_tracker.start_stage("Whisper STT (Small)")
+        profile = self.get_user_profile()
+        keywords = profile.get("vocabulary_keywords", ["Arey", "Andriy", "Spotify", "YouTube", "Larissa", "teléfono", "tele", "Netflix", "Roku", "Queen"])
+        prompt = f"Asistente personal Arey en español para Andriy. Palabras y comandos: {', '.join(keywords)}"
 
-        # 1. Intentar Google STT (Ultra-rápido ~300ms)
         try:
-            raw = self.recognizer.recognize_google(audio_data, language="es-MX")
-            if raw and raw.strip():
-                perf_tracker.end_stage("STT Transcripción")
-                return self.clean_text(raw)
-        except sr.UnknownValueError:
-            pass
+            raw_bytes = audio_data.get_raw_data(convert_rate=16000, convert_width=2)
+            audio_np = np.frombuffer(raw_bytes, dtype=np.int16).astype(np.float32) / 32768.0
+
+            segments, _ = self.whisper.transcribe(
+                audio_np,
+                language="es",
+                beam_size=1,
+                vad_filter=True,
+                vad_parameters=dict(
+                    min_silence_duration_ms=250,
+                    speech_pad_ms=80,
+                    threshold=0.45
+                ),
+                initial_prompt=prompt
+            )
+            raw = " ".join(s.text.strip() for s in segments).strip()
+            perf_tracker.end_stage("Whisper STT (Small)")
+            return self.clean_text(raw)
         except Exception as e:
-            logger.debug(f"Google STT offline o error: {e}")
+            logger.warning(f"Whisper transcribe error: {e}")
+            perf_tracker.end_stage("Whisper STT (Small)")
+            return ""
 
-        # 2. Respaldo Local con Faster-Whisper en memoria (sin escribir archivos en disco)
-        if self.whisper_model:
-            try:
-                raw_bytes = audio_data.get_raw_data(convert_rate=16000, convert_width=2)
-                audio_np = np.frombuffer(raw_bytes, dtype=np.int16).astype(np.float32) / 32768.0
-
-                segments, _ = self.whisper_model.transcribe(
-                    audio_np,
-                    language="es",
-                    beam_size=1,
-                    vad_filter=True
-                )
-                whisper_text = " ".join(s.text.strip() for s in segments).strip()
-                if whisper_text:
-                    perf_tracker.end_stage("STT Transcripción")
-                    return self.clean_text(whisper_text)
-            except Exception as e:
-                logger.debug(f"Whisper fallback error: {e}")
-
-        perf_tracker.end_stage("STT Transcripción")
-        return ""
-
-    def listen_for_wake_word(self, timeout: float = 0.6, phrase_time_limit: float = 2.0) -> bool:
+    def listen_for_wake_word(self, timeout: float = 0.8, phrase_time_limit: float = 2.5) -> bool:
         profile = self.get_user_profile()
         wake_words = list(set(self.base_wake_words + profile.get("custom_wake_words", [])))
         threshold = profile.get("calibrated_energy_threshold", 80)
@@ -183,7 +167,7 @@ class AudioPipeline:
                 if any(w in text for w in wake_words):
                     logger.info(f"✨ ¡Palabra de activación detectada! -> '{text}'")
                     return True
-        except Exception as e:
+        except Exception:
             time.sleep(0.1)
         return False
 
