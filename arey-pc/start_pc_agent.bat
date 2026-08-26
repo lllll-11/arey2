@@ -1,8 +1,9 @@
 @echo off
-title Arey 2.1 - Agente de Laptop (Windows)
+title Arey 2.1 - Agente de Laptop (Prioridad Alta)
 color 0b
 echo =======================================================
 echo          INICIANDO AGENTE DE LAPTOP - AREY 2.1
+echo       (Prioridad Alta & Rendimiento en Tiempo Real)
 echo =======================================================
 echo.
 
@@ -18,7 +19,7 @@ if not exist venv (
     call venv\Scripts\activate.bat
 )
 
-echo Conectando con el Cerebro Central de Arey...
+echo Conectando con el Cerebro Central de Arey con Prioridad Alta...
 python client.py
 
 if errorlevel 1 (

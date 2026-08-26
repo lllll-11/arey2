@@ -24,6 +24,33 @@ logger = logging.getLogger("AreyPCClient")
 
 executor = ThreadPoolExecutor(max_workers=4)
 
+def optimize_windows_environment():
+    """
+    Eleva la prioridad del proceso a ALTA (High Priority Class) y configura
+    los accesos de hardware para audio en tiempo real y anti-suspensión.
+    """
+    try:
+        import psutil
+        p = psutil.Process(os.getpid())
+        p.nice(psutil.HIGH_PRIORITY_CLASS)
+        logger.info("🚀 Prioridad del proceso elevada a ALTA (High Priority Class).")
+    except Exception as e:
+        logger.debug(f"No se pudo elevar prioridad del proceso: {e}")
+
+    try:
+        import ctypes
+        # Evitar que Windows ponga en suspensión o throttling el hilo de audio
+        ES_CONTINUOUS = 0x80000000
+        ES_SYSTEM_REQUIRED = 0x00000001
+        ES_AWAYMODE_REQUIRED = 0x00000040
+        ctypes.windll.kernel32.SetThreadExecutionState(ES_CONTINUOUS | ES_SYSTEM_REQUIRED | ES_AWAYMODE_REQUIRED)
+
+        # Aumentar precisión del reloj de Windows a 1ms para 60 FPS ultra fluidos
+        ctypes.windll.winmm.timeBeginPeriod(1)
+        logger.info("⚡ Temporizador multimedia de Windows calibrado a 1ms (60 FPS fluidos).")
+    except Exception as e:
+        logger.debug(f"Optimizador de tiempo Windows: {e}")
+
 class AreyPCClient:
     """
     Cliente Autónomo Local de Laptop Arey 2.1:
@@ -32,6 +59,7 @@ class AreyPCClient:
     - Puente WebSocket secundario solo para telemetría y control de celular Android.
     """
     def __init__(self):
+        optimize_windows_environment()
         self.ws = None
         self.running = True
         self.is_processing_voice = False
