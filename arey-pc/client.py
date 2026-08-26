@@ -212,10 +212,12 @@ class AreyPCClient:
                     ui_bridge.emit_state("speaking")
                     ui_bridge.emit_subtitle("arey", reply_text)
                     await audio_pipeline.speak(reply_text)
+                    ui_bridge.emit_state("listening")
+                    ui_bridge.emit_subtitle("status", "Escuchando...")
                     perf_tracker.print_summary(clean)
                     continue
 
-                # 2. CEREBRO LOCAL: Inferencia directa de Gemini 3.6 Flash (~350ms)
+                # 2. CEREBRO LOCAL: Inferencia directa de Gemini (~350ms)
                 ui_bridge.emit_state("thinking")
                 perf_tracker.start_stage("Gemini API Local")
 
@@ -226,6 +228,8 @@ class AreyPCClient:
                 ui_bridge.emit_state("speaking")
                 ui_bridge.emit_subtitle("arey", reply_text)
                 await audio_pipeline.speak(reply_text)
+                ui_bridge.emit_state("listening")
+                ui_bridge.emit_subtitle("status", "Escuchando...")
                 perf_tracker.print_summary(clean)
 
 if __name__ == "__main__":
