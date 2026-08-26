@@ -82,10 +82,10 @@ def tool_lock_pc() -> Dict[str, Any]:
     return pc_controller.lock_workstation()
 
 def tool_run_pc_command(command: str) -> Dict[str, Any]:
-    """Ejecuta un comando de consola PowerShell/CMD en Windows."""
+    """Ejecuta un comando de consola PowerShell o CMD directamente en la laptop Windows."""
     try:
         ui_bridge.emit_state("trabajando")
-        ui_bridge.emit_action("Ejecutando comando en Windows...")
+        ui_bridge.emit_action(f"Consola: {command[:20]}...")
     except Exception:
         pass
     return pc_controller.run_command(command)

@@ -75,8 +75,10 @@ Tu tono es directo, con un sarcasmo seco y ocasional — nunca payaso, nunca sum
    - Puedes usar humor seco cuando algo realmente lo amerite (un error absurdo, una orden extraña), pero NUNCA sacrifiques precisión ni agilidad por hacer un chiste.
 
 ### 🧠 ACCIÓN INMEDIATA CON HERRAMIENTAS:
-- Si Andriy pide música o audios ➔ USA DIRECTAMENTE `tool_play_music(query=...)`.
-- Si Andriy pregunta qué dispositivos hay en su red o WiFi ➔ USA DIRECTAMENTE `tool_scan_network_devices()`.
+- Si Andriy pide ejecutar un comando de consola, PowerShell, CMD o script ➔ USA DIRECTAMENTE `tool_run_pc_command(command=...)`.
+- Si pide abrir programas o la terminal ➔ USA DIRECTAMENTE `tool_open_pc_app(app_name=...)`.
+- Si pide música o audios ➔ USA DIRECTAMENTE `tool_play_music(query=...)`.
+- Si pregunta qué dispositivos hay en su red o WiFi ➔ USA DIRECTAMENTE `tool_scan_network_devices()`.
 - Si pide abrir páginas o servicios ➔ USA DIRECTAMENTE `tool_open_website(url_or_query=...)`.
 - Si pregunta por noticias, clima o datos en tiempo real ➔ USA DIRECTAMENTE `tool_search_web_live(query=...)`.
 - Si pide buscar su cel, llamar o mandar WhatsApp ➔ USA `tool_find_my_phone`, `tool_make_phone_call` o `tool_send_whatsapp`.
@@ -105,12 +107,14 @@ Tu tono es directo, con un sarcasmo seco y ocasional — nunca payaso, nunca sum
         if any(w in t for w in ["llama", "marcar", "llamale", "whatsapp", "mensaje", "sms", "celular", "cel", "telefono", "teléfono", "linterna", "bateria"]):
             return [tool_make_phone_call, tool_send_whatsapp, tool_find_my_phone, tool_save_personal_fact]
 
-        # Dominio 4: PC / Sistema & Búsqueda Web
-        if any(w in t for w in ["busca", "google", "web", "pagina", "página", "internet", "clima", "noticia", "recuerda", "agenda", "alarma", "calculadora"]):
-            return [tool_open_website, tool_search_web_live, tool_open_pc_app, tool_save_personal_fact]
+        # Dominio 4: PC / Sistema & Consola / Terminal & Búsqueda Web
+        if any(w in t for w in ["terminal", "consola", "cmd", "powershell", "comando", "ejecuta", "corre", "script", "ping", "ipconfig", "busca", "google", "web", "pagina", "página", "internet", "clima", "noticia", "calculadora"]):
+            return [tool_run_pc_command, tool_open_pc_app, tool_open_website, tool_search_web_live, tool_save_personal_fact]
 
         # Dominio 5: Conversación general / Mixto
         return [
+            tool_run_pc_command,
+            tool_open_pc_app,
             tool_scan_network_devices,
             tool_play_music,
             tool_make_phone_call,

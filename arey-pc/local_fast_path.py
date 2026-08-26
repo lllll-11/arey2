@@ -129,7 +129,12 @@ class LocalFastPath:
             "navegador": ("chrome", "Abriendo navegador."),
             "visual studio code": ("code", "Abriendo VS Code."),
             "vs code": ("code", "Abriendo VS Code."),
-            "discord": ("discord", "Abriendo Discord.")
+            "discord": ("discord", "Abriendo Discord."),
+            "terminal": ("terminal", "Abriendo Windows Terminal."),
+            "la terminal": ("terminal", "Abriendo Windows Terminal."),
+            "powershell": ("powershell", "Abriendo PowerShell."),
+            "cmd": ("cmd", "Abriendo Consola CMD."),
+            "consola": ("cmd", "Abriendo Consola de comandos.")
         }
 
         for trigger, (app_name, voice_reply) in apps_direct.items():
