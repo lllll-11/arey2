@@ -48,21 +48,18 @@ def optimize_windows_environment():
     except Exception as e:
         logger.debug(f"Optimizador de tiempo Windows: {e}")
 
+_single_instance_socket = None
+
 def ensure_single_instance():
-    """Garantiza que solo una instancia de Arey esté activa para no saturar el micrófono."""
+    """Garantiza mediante un puerto de socket local que no haya dos clientes abiertos a la vez."""
+    global _single_instance_socket
+    import socket
     try:
-        import psutil
-        current_pid = os.getpid()
-        for p in psutil.process_iter(['pid', 'cmdline']):
-            try:
-                if p.info['pid'] != current_pid:
-                    cmd = ' '.join(p.info['cmdline'] or [])
-                    if 'client.py' in cmd:
-                        p.terminate()
-            except Exception:
-                pass
-    except Exception:
-        pass
+        _single_instance_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        _single_instance_socket.bind(('127.0.0.1', 58731))
+    except socket.error:
+        print("⚠️ Arey ya está abierta y ejecutándose en tu pantalla.")
+        sys.exit(0)
 
 class AreyPCClient:
     """
