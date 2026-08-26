@@ -35,12 +35,12 @@ class AudioPipeline:
             pygame.mixer.init()
 
         self.recognizer = sr.Recognizer()
-        self.recognizer.energy_threshold = 340 # Compuerta de ruido: ignora música de fondo y solo capta voz directa
+        self.recognizer.energy_threshold = 220
         self.recognizer.dynamic_energy_threshold = True
-        self.recognizer.dynamic_energy_adjustment_damping = 0.15
-        self.recognizer.dynamic_energy_ratio = 1.8
-        self.recognizer.pause_threshold = 0.8
-        self.recognizer.non_speaking_duration = 0.3
+        self.recognizer.dynamic_energy_adjustment_damping = 0.10
+        self.recognizer.dynamic_energy_ratio = 1.4
+        self.recognizer.pause_threshold = 1.4 # Ventana de 1.4s de silencio para no cortar frases a medias
+        self.recognizer.non_speaking_duration = 0.6
 
         self.microphone = self._get_best_microphone()
         self.consecutive_empty_count = 0
@@ -138,14 +138,16 @@ class AudioPipeline:
         perf_tracker.end_stage("STT Transcripción")
         return ""
 
-    def listen_command(self, timeout: Optional[float] = 4.0, phrase_time_limit: float = 12.0, is_music_active: bool = False) -> str:
+    def listen_command(self, timeout: Optional[float] = 5.0, phrase_time_limit: float = 20.0, is_music_active: bool = False) -> str:
         """
-        Escucha continua del micrófono con compuerta de ruido y supresión de música de fondo.
+        Escucha continua del micrófono con ventana extendida de 1.4s para no cortar oraciones a medias.
         """
+        self.recognizer.pause_threshold = 1.4
+        self.recognizer.non_speaking_duration = 0.6
         if is_music_active:
-            self.recognizer.energy_threshold = 450
+            self.recognizer.energy_threshold = 280
         else:
-            self.recognizer.energy_threshold = 340
+            self.recognizer.energy_threshold = 220
 
         try:
             with audio_lock:
