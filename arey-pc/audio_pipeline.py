@@ -168,13 +168,40 @@ class AudioPipeline:
 
         return ""
 
+def clean_text_for_speech(text: str) -> str:
+    """
+    Limpia texto antes de enviarlo a Edge-TTS para que no pronuncie
+    asteriscos, diagonales, barras, caracteres Markdown ni URLs.
+    """
+    if not text:
+        return ""
+    # 1. Eliminar bloques de código markdown
+    t = re.sub(r'```.*?```', '', text, flags=re.DOTALL)
+    # 2. Reemplazar enlaces markdown [texto](url) por el texto
+    t = re.sub(r'\[([^\]]+)\]\([^\)]+\)', r'\1', t)
+    # 3. Eliminar URLs completas
+    t = re.sub(r'https?://\S+', '', t)
+    # 4. Eliminar símbolos que el TTS suele leer fonéticamente
+    t = re.sub(r'[*_~`#>|+=/\\{}[\]^]', ' ', t)
+    # 5. Limpiar guiones que no separan palabras
+    t = re.sub(r'\s*-\s*', ' ', t)
+    # 6. Eliminar viñetas
+    t = re.sub(r'^\s*[-•]\s*', '', t, flags=re.MULTILINE)
+    # 7. Normalizar espacios en blanco
+    t = re.sub(r'\s+', ' ', t).strip()
+    return t
+
     async def speak(self, text: str):
         if not text or not text.strip():
             return
+        clean_speech = clean_text_for_speech(text)
+        if not clean_speech:
+            return
+
         perf_tracker.start_stage("TTS Síntesis & Audio")
-        logger.info(f"Arey: '{text[:60]}...' " if len(text) > 60 else f"Arey: '{text}'")
+        logger.info(f"Arey: '{clean_speech[:60]}...' " if len(clean_speech) > 60 else f"Arey: '{clean_speech}'")
         try:
-            communicate = edge_tts.Communicate(text, voice=VOICE_NAME, rate="+15%", pitch="+0Hz")
+            communicate = edge_tts.Communicate(clean_speech, voice=VOICE_NAME, rate="+15%", pitch="+0Hz")
             audio_buffer = bytearray()
 
             async for chunk in communicate.stream():

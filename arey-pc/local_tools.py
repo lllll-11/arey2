@@ -106,13 +106,48 @@ def tool_type_text(text: str) -> Dict[str, Any]:
     except Exception as e:
         return {"status": "error", "error": str(e)}
 
-def tool_click_mouse(x: int, y: int) -> Dict[str, Any]:
-    """Hace clic en unas coordenadas exactas (x, y) de la pantalla."""
+def tool_move_mouse(x: int, y: int) -> Dict[str, Any]:
+    """Mueve el cursor del ratón suavemente a unas coordenadas (x, y) de la pantalla."""
     try:
         ui_bridge.emit_state("trabajando")
-        ui_bridge.emit_action(f"Clic en ({x}, {y})...")
-        pyautogui.click(x, y)
-        return {"status": "success", "message": f"Clic ejecutado en ({x}, {y})."}
+        ui_bridge.emit_action(f"Moviendo cursor a ({x}, {y})...")
+        pyautogui.moveTo(x, y, duration=0.25)
+        return {"status": "success", "message": f"Cursor ubicado en ({x}, {y})."}
+    except Exception as e:
+        return {"status": "error", "error": str(e)}
+
+def tool_control_mouse(action: str = "click", x: Optional[int] = None, y: Optional[int] = None, button: str = "left", clicks: int = 1) -> Dict[str, Any]:
+    """Controla el ratón en la laptop: hace clic izquierdo, derecho, doble clic, arrastra o ubica el cursor en (x, y)."""
+    try:
+        ui_bridge.emit_state("trabajando")
+        if x is not None and y is not None:
+            ui_bridge.emit_action(f"Clic en ({x}, {y})...")
+            pyautogui.moveTo(x, y, duration=0.2)
+        else:
+            ui_bridge.emit_action(f"Clic {button}...")
+
+        if action == "double_click":
+            pyautogui.doubleClick(button=button)
+        elif action == "right_click" or button == "right":
+            pyautogui.rightClick()
+        elif action == "scroll_down":
+            pyautogui.scroll(-300)
+        elif action == "scroll_up":
+            pyautogui.scroll(300)
+        else:
+            pyautogui.click(button=button, clicks=clicks)
+
+        cur_x, cur_y = pyautogui.position()
+        return {"status": "success", "action": action, "position": f"({cur_x}, {cur_y})"}
+    except Exception as e:
+        return {"status": "error", "error": str(e)}
+
+def tool_get_screen_and_mouse_info() -> Dict[str, Any]:
+    """Obtiene la resolución de la pantalla de la laptop y la posición actual del cursor (x, y)."""
+    try:
+        w, h = pyautogui.size()
+        mx, my = pyautogui.position()
+        return {"status": "success", "screen_width": w, "screen_height": h, "cursor_x": mx, "cursor_y": my}
     except Exception as e:
         return {"status": "error", "error": str(e)}
 

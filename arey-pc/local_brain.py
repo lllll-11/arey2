@@ -12,7 +12,8 @@ from local_memory import local_memory
 from pc_controller import pc_controller
 from local_tools import (
     tool_run_pc_command, tool_read_file, tool_write_file, tool_list_files,
-    tool_open_file_or_folder, tool_type_text, tool_click_mouse, tool_get_system_info,
+    tool_open_file_or_folder, tool_type_text, tool_move_mouse, tool_control_mouse,
+    tool_get_screen_and_mouse_info, tool_get_system_info,
     tool_set_pc_volume, tool_control_pc_media, tool_play_music,
     tool_open_website, tool_open_pc_app, tool_press_hotkey, tool_lock_pc,
     tool_scan_network_devices, tool_control_smart_tv,
@@ -25,10 +26,10 @@ logger = logging.getLogger("AreyLocalBrain")
 class LocalAreyBrain:
     """
     Cerebro Local de Alta Velocidad para Laptop con Gemini 3.6 Flash:
-    - ACCESO TOTAL Y CONTROL NATIVO COMPLETO DE WINDOWS (Sin sandbox ni entorno aislado).
-    - Archivos, Terminal PowerShell/CMD, Teclado/Mouse, WiFi, Smart TV y Celular.
+    - Control total del sistema Windows sin sandbox ni aislamiento.
+    - Síntesis hablada limpia en resúmenes directos (cero lectura de asteriscos, diagonales o texto crudo).
+    - Control de ratón y posicionamiento de cursor calibrado.
     - Visión multimodal de pantalla nativa (< 300 tokens).
-    - Inyección en tiempo real de hora local, fecha y contexto de sistema.
     """
     def __init__(self):
         self.client = None
@@ -38,7 +39,7 @@ class LocalAreyBrain:
         if GEMINI_API_KEY and GEMINI_API_KEY != "tu_clave_de_gemini_aqui":
             try:
                 self.client = genai.Client(api_key=GEMINI_API_KEY)
-                logger.info("🧠 Cerebro Local de Arey inicializado con Gemini API (Control Total de Sistema).")
+                logger.info("🧠 Cerebro Local de Arey inicializado con Gemini API.")
             except Exception as e:
                 logger.error(f"Error inicializando Gemini local: {e}")
 
@@ -59,26 +60,37 @@ class LocalAreyBrain:
 
         system_prompt = f"""
 Eres **Arey**, la IA personal y asistente nativa de **Andriy** con **ACCESO TOTAL Y CONTROL COMPLETO DE SU LAPTOP WINDOWS 11**.
-NO ESTÁS EN NINGÚN ENTORNO AISLADO NI SANDBOX: Tienes permisos completos de ejecución sobre el sistema de archivos, terminal de comandos, procesos, red WiFi, Smart TV y periféricos.
+NO ESTÁS EN NINGÚN ENTORNO AISLADO NI SANDBOX: Tienes permisos completos de ejecución sobre el sistema de archivos, terminal de comandos, procesos, teclado/ratón, red WiFi, Smart TV y celular.
 
 === CONTEXTO TEMPORAL Y SISTEMA ===
 - Fecha y Hora Actual: {now_str}
 - Usuario: Andriy
 - Entorno: Laptop Windows 11 (Ejecución Nativa con Privilegios Totales)
 
-### 🎭 PERSONALIDAD Y REGLAS DE CONDUCTA:
-1. **Directa, Técnica y Sin Relleno**:
-   - NUNCA uses frases sumisas corporativas tipo *"¡Claro que sí!"*, *"¡Con gusto!"*, *"¿En qué más te puedo ayudar?"*, *"Como modelo de lenguaje..."*.
-   - Ve directo al grano con naturalidad técnica y concisa.
-2. **Capacidad de Ejecución Absoluta**:
-   - Si Andriy te pide crear un archivo, abrir una carpeta, correr un script, instalar un paquete, revisar procesos o modificar el sistema: EJECÚTALO DE INMEDIATO con tus herramientas.
-3. **Honestidad Total ante Fallos o Demoras**:
-   - Si algo tarda o falla, dilo directamente (*"falló el comando X"*, *"no encontré el archivo Y"*).
+### 🎙️ REGLAS OBLIGATORIAS DE SÍNTESIS Y LECTURA HABLADA (CRÍTICO):
+1. **NUNCA LEAS TEXTO CRUDO NI CONTENIDO COMPLETO**:
+   - Cuando leas la pantalla, archivos, resultados de terminal o páginas web: **NUNCA leas el texto literal ni párrafos largos de principio a fin**.
+   - Dale SIEMPRE a Andriy un **RESUMEN CORTO, CONCISO Y DIGERIBLE de 1 a 3 oraciones en lenguaje natural hablado**.
+2. **CERO PRONUNCIACIÓN DE SÍMBOLOS TÉCNICOS**:
+   - NUNCA digas *"asterisco"*, *"diagonal"*, *"barra"*, *"guión"*, *"corchete"*, caracteres Markdown (`**`, `##`, `//`) ni URLs largas.
+   - Habla como una persona normal contándole a su colega qué hay en la pantalla o qué dice el documento.
+
+### 🖱️ CONTROL DE RATÓN Y POSICIONAMIENTO DEL CURSOR:
+- Para mover el ratón a un punto específico de la pantalla: USA `tool_move_mouse(x=..., y=...)`.
+- Para hacer clic o doble clic en un botón o elemento: USA `tool_control_mouse(action='click', x=..., y=...)`.
+- **Mapa de Coordenadas de Referencia (Laptop 1920x1080)**:
+  - Centro de la pantalla: `(960, 540)`
+  - Esquina superior izquierda: `(50, 50)`
+  - Botón cerrar (arriba a la derecha): `(1880, 20)`
+  - Barra de tareas inferior: `(960, 1050)`
+  - Botón Inicio de Windows: `(25, 1055)`
+- Si inspeccionas la pantalla con captura, localiza visualmente el botón o elemento y envía sus coordenadas `(x, y)` para que el cursor se mueva exactamente sobre él.
 
 ### 🛠️ CATÁLOGO DE HERRAMIENTAS ACTIVAS:
+- **Ratón y Cursor**: `tool_move_mouse(x, y)`, `tool_control_mouse(action, x, y)`, `tool_get_screen_and_mouse_info()`.
 - **Consola / Scripts**: `tool_run_pc_command(command=...)` ➔ Ejecuta cualquier comando PowerShell / CMD.
 - **Archivos**: `tool_read_file`, `tool_write_file`, `tool_list_files`, `tool_open_file_or_folder`.
-- **Automatización**: `tool_type_text`, `tool_click_mouse`, `tool_press_hotkey`, `tool_lock_pc`, `tool_open_pc_app`.
+- **Automatización**: `tool_type_text`, `tool_press_hotkey`, `tool_lock_pc`, `tool_open_pc_app`.
 - **Estado de Laptop**: `tool_get_system_info` ➔ CPU, RAM, Batería.
 - **Música & Audio**: `tool_play_music(query=...)`, `tool_control_pc_media(action=...)`, `tool_set_pc_volume(level_percent=...)`.
 - **Red Local & Smart Home**: `tool_scan_network_devices()`, `tool_control_smart_tv(command=...)`.
@@ -92,13 +104,15 @@ NO ESTÁS EN NINGÚN ENTORNO AISLADO NI SANDBOX: Tienes permisos completos de ej
 
     def _get_all_tools(self) -> List[Any]:
         return [
+            tool_move_mouse,
+            tool_control_mouse,
+            tool_get_screen_and_mouse_info,
+            tool_type_text,
             tool_run_pc_command,
             tool_read_file,
             tool_write_file,
             tool_list_files,
             tool_open_file_or_folder,
-            tool_type_text,
-            tool_click_mouse,
             tool_get_system_info,
             tool_open_pc_app,
             tool_open_website,
@@ -118,11 +132,8 @@ NO ESTÁS EN NINGÚN ENTORNO AISLADO NI SANDBOX: Tienes permisos completos de ej
 
     def _filter_tools_by_intent(self, text: str) -> List[Any]:
         t = text.lower()
-        # Si es solo la hora o saludo rápido sin acción, no inyectar herramientas para máxima velocidad (<200ms)
         if any(w in t for w in ["que hora es", "qué hora es", "la hora", "que dia es", "qué día es", "fecha"]):
             return []
-        
-        # Para todo lo demás, entregar la suite COMPLETA de herramientas sin restricciones
         return self._get_all_tools()
 
     async def process_user_message(self, user_text: str) -> str:
@@ -185,7 +196,7 @@ NO ESTÁS EN NINGÚN ENTORNO AISLADO NI SANDBOX: Tienes permisos completos de ej
         message_parts = []
         if screen_bytes:
             message_parts.append(types.Part.from_bytes(data=screen_bytes, mime_type="image/jpeg"))
-            message_parts.append(types.Part.from_text(text=f"Andriy te pide analizar su pantalla: '{user_text}'. Describe lo que ves de forma concisa y técnica."))
+            message_parts.append(types.Part.from_text(text=f"Andriy te pide analizar su pantalla: '{user_text}'. Proporciona un RESUMEN HABLADO CORTO de 1 a 3 oraciones. NUNCA leas texto literal ni pronuncies asteriscos ni diagonales."))
         else:
             message_parts.append(types.Part.from_text(text=user_text))
 
