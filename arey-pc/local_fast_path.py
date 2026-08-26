@@ -7,8 +7,8 @@ logger = logging.getLogger("AreyFastPath")
 
 class LocalFastPath:
     """
-    Enrutador determinista local de baja latencia (< 10ms).
-    Intercepta comandos de hardware y sistema en la laptop antes de enviar a la nube.
+    Enrutador determinista local de ultrabaja latencia (< 1ms).
+    Ejecuta comandos de hardware, volumen y control de Windows inmediatamente en la laptop.
     """
     def __init__(self):
         pass
@@ -16,7 +16,7 @@ class LocalFastPath:
     def try_execute_local(self, text: str) -> Optional[Tuple[str, str]]:
         """
         Analiza si el texto corresponde a un comando local determinista de Windows.
-        Retorna (accion_ejecutada, respuesta_vocal) o None si requiere procesamiento en la nube / IA.
+        Retorna (accion_ejecutada, respuesta_vocal) o None si requiere procesamiento de IA.
         """
         if not text:
             return None
@@ -24,20 +24,18 @@ class LocalFastPath:
         t = text.lower().strip().rstrip(".?!,")
 
         # ----------------- 1. CONTROL DE VOLUMEN -----------------
-        # "pon volumen al 50", "volumen a 80", "sube el volumen al 100"
-        match_vol = re.search(r'(?:pon|ajusta|sube|baja)?\s*(?:el\s*)?volumen\s*(?:al?|en)?\s*(\d{1,3})%?', t)
-        if match_vol:
+        # "pon volumen al 50", "volumen a 80", "subelo al 90", "súbelo al 100"
+        match_vol = re.search(r'(?:pon|ajusta|sube|subelo|subelo\s*al|subele|baja|bajalo|bajalo\s*al|bajale)?\s*(?:el\s*)?(?:volumen)?\s*(?:al?|en|a)?\s*(\d{1,3})%?', t)
+        if match_vol and match_vol.group(1):
             level = int(match_vol.group(1))
             pc_controller.set_volume(level)
             return ("set_volume", f"Volumen ajustado al {level}%.")
 
-        if any(w in t for w in ["sube volumen", "sube el volumen", "subele al volumen", "subele"]):
-            # Subir 15%
-            pc_controller.set_volume(75)
+        if any(w in t for w in ["sube volumen", "sube el volumen", "subele al volumen", "subelo al", "súbelo al", "subelo", "súbelo", "subele", "súbele", "mas volumen", "más volumen"]):
+            pc_controller.set_volume(80)
             return ("volume_up", "Listo, volumen subido.")
 
-        if any(w in t for w in ["baja volumen", "baja el volumen", "bajale al volumen", "bajale"]):
-            # Bajar 15%
+        if any(w in t for w in ["baja volumen", "baja el volumen", "bajale al volumen", "bajalo al", "bájalo al", "bajalo", "bájalo", "bajale", "bájale", "menos volumen"]):
             pc_controller.set_volume(30)
             return ("volume_down", "Listo, volumen bajado.")
 
@@ -58,39 +56,42 @@ class LocalFastPath:
             pc_controller.control_media("next")
             return ("next_track", "Pista siguiente.")
 
-        if any(w in t for w in ["cancion anterior", "pista anterior", "anterior"]):
+        if any(w in t for w in ["anterior cancion", "cancion anterior", "anterior", "regresa la cancion"]):
             pc_controller.control_media("previous")
             return ("prev_track", "Pista anterior.")
 
-        # ----------------- 3. ATAJOS DE SISTEMA WINDOWS -----------------
-        if any(w in t for w in ["bloquea la compu", "bloquea la laptop", "bloquear computadora", "bloquear laptop", "bloquea"]):
+        # ----------------- 3. ATAJOS DE SISTEMA -----------------
+        if any(w in t for w in ["bloquea la laptop", "bloquea pc", "bloquea la compu", "bloquear"]):
             pc_controller.lock_workstation()
             return ("lock_pc", "Laptop bloqueada.")
 
-        if any(w in t for w in ["minimiza todo", "minimizar todo", "muestra el escritorio", "ver escritorio", "escritorio"]):
+        if any(w in t for w in ["muestra escritorio", "ver escritorio", "minimiza todo", "minimizar todo"]):
             pc_controller.press_hotkey("win+d")
-            return ("show_desktop", "Mostrando escritorio.")
+            return ("show_desktop", "Escritorio mostrado.")
 
-        # ----------------- 4. APERTURA RÁPIDA DE APLICACIONES LOCALES -----------------
-        app_patterns = [
-            (r'abre\s*(?:la\s*)?calculadora', "calculadora", "Abriendo calculadora."),
-            (r'abre\s*(?:el\s*)?bloc de notas', "bloc de notas", "Abriendo bloc de notas."),
-            (r'abre\s*(?:el\s*)?vs\s*code|abre\s*visual studio code|abre\s*codigo', "vs code", "Abriendo Visual Studio Code."),
-            (r'abre\s*(?:el\s*)?explorador|abre\s*(?:los\s*)?archivos', "explorador", "Abriendo explorador de archivos."),
-            (r'abre\s*(?:la\s*)?terminal|abre\s*(?:la\s*)?consola|abre\s*cmd', "terminal", "Abriendo terminal."),
-            (r'abre\s*(?:el\s*)?navegador|abre\s*chrome|abre\s*google chrome', "chrome", "Abriendo Google Chrome."),
-            (r'abre\s*spotify', "spotify", "Abriendo Spotify."),
-            (r'abre\s*discord', "discord", "Abriendo Discord."),
-            (r'abre\s*word', "word", "Abriendo Word."),
-            (r'abre\s*excel', "excel", "Abriendo Excel.")
-        ]
+        if any(w in t for w in ["cierra ventana", "cerrar ventana", "cierra esto"]):
+            pc_controller.press_hotkey("alt+f4")
+            return ("close_window", "Ventana cerrada.")
 
-        for pattern, app_key, reply in app_patterns:
-            if re.search(pattern, t):
-                pc_controller.open_app(app_key)
-                return (f"open_app_{app_key}", reply)
+        # ----------------- 4. ABRIR APLICACIONES COMUNES -----------------
+        apps_direct = {
+            "calculadora": ("calc", "Abriendo calculadora."),
+            "calc": ("calc", "Abriendo calculadora."),
+            "bloc de notas": ("notepad", "Abriendo Bloc de Notas."),
+            "notepad": ("notepad", "Abriendo Bloc de Notas."),
+            "spotify": ("spotify", "Abriendo Spotify."),
+            "chrome": ("chrome", "Abriendo Google Chrome."),
+            "navegador": ("chrome", "Abriendo navegador."),
+            "visual studio code": ("code", "Abriendo VS Code."),
+            "vs code": ("code", "Abriendo VS Code."),
+            "discord": ("discord", "Abriendo Discord.")
+        }
 
-        # No es un comando determinista local -> Requiere IA / Nube
+        for trigger, (app_name, voice_reply) in apps_direct.items():
+            if t == f"abre {trigger}" or t == f"abrir {trigger}" or t == trigger:
+                pc_controller.open_app(app_name)
+                return (f"open_{app_name}", voice_reply)
+
         return None
 
 local_fast_path = LocalFastPath()
